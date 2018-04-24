@@ -35,6 +35,7 @@ dotnet-uninstall-debian-packages.sh
 # Ignore binaries and symbols
 *.pdb
 *.dll
+*.wixpdb
 
 # Ignore packages
 *.deb
@@ -43,24 +44,16 @@ dotnet-uninstall-debian-packages.sh
 *.rpm
 *.pkg
 *.nupkg
-
-# ignore the telemetry semaphore file
-DELETE_ME_TO_DISABLE_CONSOLEHOST_TELEMETRY
+*.AppImage
 
 # default location for produced nuget packages
 /nuget-artifacts
-
-# generated man files
-/assets/powershell.1*
 
 # resgen output
 gen
 
 # Per repo profile
 .profile.ps1
-
-#VS Code files
-.vscode
 
 # macOS
 .DS_Store
@@ -70,4 +63,4 @@ TestsResults*.xml
 
 # Resharper settings
 PowerShell.sln.DotSettings.user
-
+*.msp

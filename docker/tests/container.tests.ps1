@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
 Import-module -Name "$PSScriptRoot\containerTestCommon.psm1" -Force
 $script:linuxContainerTests = Get-LinuxContainer
 $script:windowsContainerTests = Get-WindowsContainer
@@ -14,7 +17,7 @@ Describe "Build Linux Containers" -Tags 'Build', 'Linux' {
             [Parameter(Mandatory=$true)]
             [string]
             $name,
-            
+
             [Parameter(Mandatory=$true)]
             [string]
             $path
@@ -33,7 +36,7 @@ Describe "Build Windows Containers" -Tags 'Build', 'Windows' {
             [Parameter(Mandatory=$true)]
             [string]
             $name,
-            
+
             [Parameter(Mandatory=$true)]
             [string]
             $path
@@ -57,24 +60,23 @@ Describe "Linux Containers run PowerShell" -Tags 'Behavior', 'Linux' {
         # prune unused volumes
         $null=Invoke-Docker -Command 'volume', 'prune' -Params '--force' -SuppressHostOutput
     }
-    BeforeEach
-    {
+    BeforeEach {
         Remove-Item $testContext.resolvedXmlPath -ErrorAction SilentlyContinue
         Remove-Item $testContext.resolvedLogPath -ErrorAction SilentlyContinue
     }
-    
+
     it "Get PSVersion table from $(Get-RepoName):<Name>" -TestCases $script:linuxContainerTests -Skip:$script:skipLinux {
         param(
             [Parameter(Mandatory=$true)]
             [string]
             $name,
-            
+
             [Parameter(Mandatory=$true)]
             [string]
             $path
         )
 
-        Get-ContainerPowerShellVersion -TestContext $testContext -Name $Name -RepoName (Get-RepoName)  | should be '6.0.0-beta'
+        Get-ContainerPowerShellVersion -TestContext $testContext -Name $Name -RepoName (Get-RepoName)  | should be '6.0.2'
     }
 }
 
@@ -82,23 +84,22 @@ Describe "Windows Containers run PowerShell" -Tags 'Behavior', 'Windows' {
     BeforeAll{
         $testContext = Get-TestContext -type Windows
     }
-    BeforeEach
-    {
+    BeforeEach {
         Remove-Item $testContext.resolvedXmlPath -ErrorAction SilentlyContinue
         Remove-Item $testContext.resolvedLogPath -ErrorAction SilentlyContinue
     }
-    
+
     it "Get PSVersion table from $(Get-RepoName):<Name>" -TestCases $script:windowsContainerTests -skip:$script:skipWindows {
         param(
             [Parameter(Mandatory=$true)]
             [string]
             $name,
-            
+
             [Parameter(Mandatory=$true)]
             [string]
             $path
         )
 
-        Get-ContainerPowerShellVersion -TestContext $testContext -Name $Name -RepoName (Get-RepoName)  | should be '6.0.0-beta'
+        Get-ContainerPowerShellVersion -TestContext $testContext -Name $Name -RepoName (Get-RepoName)  | should be '6.0.2'
     }
 }

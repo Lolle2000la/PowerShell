@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -232,7 +231,7 @@ namespace System.Management.Automation
                         }
                         ++index;
                         argument.ParameterName = matchingParameter.Parameter.Name;
-                        argument.SetArgumentValue(nextArgument.ArgumentExtent, nextArgument.ParameterText);
+                        argument.SetArgumentValue(nextArgument.ArgumentAst, nextArgument.ParameterText);
                         result.Add(argument);
                         continue;
                     }
@@ -242,7 +241,7 @@ namespace System.Management.Automation
 
                     ++index;
                     argument.ParameterName = matchingParameter.Parameter.Name;
-                    argument.SetArgumentValue(nextArgument.ArgumentExtent, nextArgument.ArgumentValue);
+                    argument.SetArgumentValue(nextArgument.ArgumentAst, nextArgument.ArgumentValue);
                     result.Add(argument);
                 }
                 else
@@ -278,7 +277,7 @@ namespace System.Management.Automation
             if (matchingParameter.Type == typeof(SwitchParameter))
             {
                 argument.ParameterName = argumentName;
-                argument.SetArgumentValue(PositionUtilities.EmptyExtent, SwitchParameter.Present);
+                argument.SetArgumentValue(null, SwitchParameter.Present);
                 result = true;
             }
 
@@ -336,8 +335,8 @@ namespace System.Management.Automation
                     foreach (KeyValuePair<string, object> boundParameter in boundParameters)
                     {
                         CommandParameterInternal param = CommandParameterInternal.CreateParameterWithArgument(
-                            PositionUtilities.EmptyExtent, boundParameter.Key, boundParameter.Key,
-                            PositionUtilities.EmptyExtent, boundParameter.Value, false);
+                            /*parameterAst*/null, boundParameter.Key, boundParameter.Key,
+                            /*argumentAst*/null, boundParameter.Value, false);
                         commandProcessor.AddParameter(param);
                     }
                 }
@@ -358,28 +357,27 @@ namespace System.Management.Automation
                             if (colonIndex != -1 && colonIndex != paramText.Length - 1)
                             {
                                 param = CommandParameterInternal.CreateParameterWithArgument(
-                                    PositionUtilities.EmptyExtent, paramText.Substring(1, colonIndex - 1), paramText,
-                                    PositionUtilities.EmptyExtent, paramText.Substring(colonIndex + 1).Trim(),
+                                    /*parameterAst*/null, paramText.Substring(1, colonIndex - 1), paramText,
+                                    /*argumentAst*/null, paramText.Substring(colonIndex + 1).Trim(),
                                     false);
                             }
                             else if (argIndex == arguments.Length - 1 || paramText[paramText.Length - 1] != ':')
                             {
                                 param = CommandParameterInternal.CreateParameter(
-                                    PositionUtilities.EmptyExtent, paramText.Substring(1), paramText);
+                                    paramText.Substring(1), paramText);
                             }
                             else
                             {
                                 param = CommandParameterInternal.CreateParameterWithArgument(
-                                    PositionUtilities.EmptyExtent, paramText.Substring(1, paramText.Length - 2), paramText,
-                                    PositionUtilities.EmptyExtent, arguments[argIndex + 1],
+                                    /*parameterAst*/null, paramText.Substring(1, paramText.Length - 2), paramText,
+                                    /*argumentAst*/null, arguments[argIndex + 1],
                                     false);
                                 argIndex++;
                             }
                         }
                         else
                         {
-                            param = CommandParameterInternal.CreateArgument(
-                                PositionUtilities.EmptyExtent, arguments[argIndex]);
+                            param = CommandParameterInternal.CreateArgument(arguments[argIndex]);
                         }
                         commandProcessor.AddParameter(param);
                     }
@@ -445,8 +443,7 @@ namespace System.Management.Automation
                             null,
                             null,
                             ParameterBinderStrings.ParameterAlreadyBound,
-                            "ParameterAlreadyBound");
-
+                            nameof(ParameterBinderStrings.ParameterAlreadyBound));
 
                     throw bindingException;
                 }
@@ -635,7 +632,6 @@ namespace System.Management.Automation
                     // by introducing the default parameter binding.
                     throw bindingException;
                 }
-
 
                 if (positionalParameterDictionary.Count > 0)
                 {
@@ -841,8 +837,8 @@ namespace System.Management.Automation
                     {
                         CommandParameterInternal bindableArgument =
                             CommandParameterInternal.CreateParameterWithArgument(
-                                PositionUtilities.EmptyExtent, parameterName, "-" + parameterName + ":",
-                                argument.ArgumentExtent, argument.ArgumentValue,
+                                /*parameterAst*/null, parameterName, "-" + parameterName + ":",
+                                argument.ArgumentAst, argument.ArgumentValue,
                                 false);
 
                         bindResult =
@@ -903,7 +899,6 @@ namespace System.Management.Automation
             return result;
         }
 
-
         /// <summary>
         /// Generate elaborated binding exception so that the user will know the default binding might cause the failure
         /// </summary>
@@ -941,7 +936,6 @@ namespace System.Management.Automation
 
             throw newBindingException;
         }
-
 
         private static CommandParameterInternal GetNextPositionalArgument(
             List<CommandParameterInternal> unboundArgumentsCollection,
@@ -1173,8 +1167,8 @@ namespace System.Management.Automation
                     object result = spb.GetDefaultScriptParameterValue(runtimeDefinedParameter, implicitUsingParameters);
                     SaveDefaultScriptParameterValue(parameter.Parameter.Name, result);
                     CommandParameterInternal argument = CommandParameterInternal.CreateParameterWithArgument(
-                        PositionUtilities.EmptyExtent, parameter.Parameter.Name, "-" + parameter.Parameter.Name + ":",
-                        PositionUtilities.EmptyExtent, result,
+                        /*parameterAst*/null, parameter.Parameter.Name, "-" + parameter.Parameter.Name + ":",
+                        /*argumentAst*/null, result,
                         false);
                     ParameterBindingFlags flags = ParameterBindingFlags.IsDefaultValue;
                     // Only coerce explicit values.  We default to null, which isn't always convertible.

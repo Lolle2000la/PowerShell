@@ -1,4 +1,6 @@
-﻿param(
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+param(
     [Parameter(Mandatory = $true, Position = 0)] $coverallsToken,
     [Parameter(Mandatory = $true, Position = 1)] $codecovToken,
     [Parameter(Position = 2)] $azureLogDrive = "L:\",
@@ -143,6 +145,17 @@ $jsonFile = "$outputBaseFolder\CC.json"
 
 try
 {
+    ## Github needs TLS1.2 whereas the defaults for Invoke-WebRequest do not have TLS1.2
+    $prevSecProtocol = [System.Net.ServicePointManager]::SecurityProtocol
+
+    [System.Net.ServicePointManager]::SecurityProtocol =
+        [System.Net.ServicePointManager]::SecurityProtocol -bor
+        [System.Security.Authentication.SslProtocols]::Tls12 -bor
+        [System.Security.Authentication.SslProtocols]::Tls11
+
+    # first thing to do is to be sure that no processes are running which will cause us issues
+    Get-Process pwsh -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction Stop
+
     ## This is required so we do not keep on merging coverage reports.
     if(Test-Path $outputLog)
     {
@@ -238,8 +251,11 @@ try
     }
 
     # grab the commitID, we need this to grab the right sources
-    $gitCommitId = & "$psBinPath\powershell.exe" -noprofile -command { $PSVersiontable.GitCommitId }
-    $commitId = $gitCommitId.substring($gitCommitId.LastIndexOf('-g') + 2)
+    $assemblyLocation = & "$psBinPath\pwsh.exe" -noprofile -command { Get-Item ([psobject].Assembly.Location) }
+    $productVersion = $assemblyLocation.VersionInfo.productVersion
+    $commitId = $productVersion.split(" ")[-1]
+
+    Write-LogPassThru -Message "Using GitCommitId: $commitId"
 
     # download the src directory
     try
@@ -248,19 +264,19 @@ try
         # operations relative to where the test location is.
         # some tests rely on source files being available in $outputBaseFolder/test
         Push-Location $outputBaseFolder
+
         # clean up partial repo clone before starting
-        if ( Test-Path "$outputBaseFolder/.git" )
+        $cleanupDirectories = "${outputBaseFolder}/.git",
+            "${outputBaseFolder}/src",
+            "${outputBaseFolder}/assets"
+        foreach($directory in $cleanupDirectories)
         {
-            Remove-Item -Force -Recurse "${outputBaseFolder}/.git"
+            if ( Test-Path "$directory" )
+            {
+                Remove-Item -Force -Recurse "$directory"
+            }
         }
-        if ( Test-Path "$outputBaseFolder/src" )
-        {
-            Remove-Item -Force -Recurse "${outputBaseFolder}/src"
-        }
-        if ( Test-Path "$outputBaseFolder/assests" )
-        {
-            Remove-Item -Force -Recurse "${outputBaseFolder}/assets"
-        }
+
         Write-LogPassThru -Message "initializing repo in $outputBaseFolder"
         & $gitexe init
         Write-LogPassThru -Message "git operation 'init' returned $LASTEXITCODE"
@@ -274,8 +290,8 @@ try
         Write-LogPassThru -Message "git operation 'set sparse-checkout' returned $LASTEXITCODE"
 
         Write-LogPassThru -Message "pulling sparse repo"
-        "src" | Out-File -Encoding ascii .git\info\sparse-checkout -Force
-        "assets" | Out-File -Encoding ascii .git\info\sparse-checkout -Append
+        "/src" | Out-File -Encoding ascii .git\info\sparse-checkout -Force
+        "/assets" | Out-File -Encoding ascii .git\info\sparse-checkout -Append
         & $gitexe pull origin master
         Write-LogPassThru -Message "git operation 'pull' returned $LASTEXITCODE"
 
@@ -291,8 +307,14 @@ try
     $openCoverParams | Out-String | Write-LogPassThru
     Write-LogPassThru -Message "Starting test run."
 
-    # now invoke opencover
-    Invoke-OpenCover @openCoverParams
+    try {
+        # now invoke opencover
+        Invoke-OpenCover @openCoverParams | Out-String | Write-LogPassThru
+    }
+    catch {
+        ("ERROR: " + $_.ScriptStackTrace) | Write-LogPassThru
+        $_ 2>&1 | out-string -Stream | %{ "ERROR: $_" } | Write-LogPassThru
+    }
 
     if(Test-Path $outputLog)
     {
@@ -323,6 +345,9 @@ catch
 }
 finally
 {
+    ## reset TLS1.2 settings.
+    [System.Net.ServicePointManager]::SecurityProtocol = $prevSecProtocol
+
     # the powershell execution should be done, be sure that there are no PowerShell test executables running because
     # they will cause subsequent coverage runs to behave poorly. Make sure that the path is properly formatted, and
     # we need to use like rather than match because on Windows, there will be "\" as path separators which would need

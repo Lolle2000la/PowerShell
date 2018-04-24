@@ -1,7 +1,5 @@
-
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections;
 using System.Collections.Generic;
@@ -96,7 +94,6 @@ namespace System.Management.Automation
             return cursor.Offset < extent.StartOffset || cursor.Offset > extent.EndOffset;
         }
 
-
         internal CompletionContext CreateCompletionContext(PowerShell powerShell)
         {
             var typeInferenceContext = new TypeInferenceContext(powerShell);
@@ -166,7 +163,6 @@ namespace System.Management.Automation
         {
             return tokens.LastOrDefault(token => IsCursorAfterExtent(cursorPosition, token.Extent) && IsInterestingToken(token));
         }
-
 
         private static Ast GetLastAstAtCursor(ScriptBlockAst scriptBlockAst, IScriptPosition cursorPosition)
         {
@@ -471,11 +467,11 @@ namespace System.Management.Automation
                         }
                         break;
                     case TokenKind.AtCurly:
-                        // Handle scenarios such as 'Sort-Object @{<tab>' and  'gci | Format-Table @{'                    
+                        // Handle scenarios such as 'Sort-Object @{<tab>' and  'gci | Format-Table @{'
                         result = GetResultForHashtable(completionContext);
                         replacementIndex += 2;
                         replacementLength = 0;
-                        break;                    
+                        break;
 
                     case TokenKind.Number:
                         // Handle scenarios such as Get-Process -Id 5<tab> || Get-Process -Id 5210, 3<tab> || Get-Process -Id: 5210, 3<tab>

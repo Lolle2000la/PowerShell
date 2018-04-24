@@ -1,6 +1,5 @@
-/********************************************************************--
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 using System.IO;
@@ -26,7 +25,6 @@ using System.Runtime.InteropServices;
 using System.Resources;
 using Microsoft.Win32;
 using System.Text.RegularExpressions;
-
 
 namespace Microsoft.PowerShell.Commands
 {
@@ -105,7 +103,6 @@ namespace Microsoft.PowerShell.Commands
         }
         private PSCredential _credential;
 
-
         /// <summary>
         /// use default credential..
         /// </summary>
@@ -150,7 +147,7 @@ namespace Microsoft.PowerShell.Commands
         /// </summary>
         protected override void BeginProcessing()
         {
-            if (_uri.ToString().Trim().Length == 0)
+            if (string.IsNullOrWhiteSpace(_uri.ToString()))
             {
                 Exception ex = new ArgumentException(WebServiceResources.InvalidUri);
                 ErrorRecord er = new ErrorRecord(ex, "ArgumentException", ErrorCategory.InvalidOperation, null);

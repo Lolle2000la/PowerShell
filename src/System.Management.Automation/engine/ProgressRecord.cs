@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Runtime.Serialization;
 using Dbg = System.Management.Automation.Diagnostics;
@@ -66,9 +65,9 @@ namespace System.Management.Automation
                 throw PSTraceSource.NewArgumentException("activity", ProgressRecordStrings.ArgMayNotBeNullOrEmpty, "statusDescription");
             }
 
-            _id = activityId;
-            _activity = activity;
-            _status = statusDescription;
+            this.id = activityId;
+            this.activity = activity;
+            this.status = statusDescription;
         }
 
         /// <summary>
@@ -77,14 +76,14 @@ namespace System.Management.Automation
         /// <param name="other"></param>
         internal ProgressRecord(ProgressRecord other)
         {
-            _activity = other._activity;
-            _currentOperation = other._currentOperation;
-            _id = other._id;
-            _parentId = other._parentId;
-            _percent = other._percent;
-            _secondsRemaining = other._secondsRemaining;
-            _status = other._status;
-            _type = other._type;
+            this.activity = other.activity;
+            this.currentOperation = other.currentOperation;
+            this.id = other.id;
+            this.parentId = other.parentId;
+            this.percent = other.percent;
+            this.secondsRemaining = other.secondsRemaining;
+            this.status = other.status;
+            this.type = other.type;
         }
 
         /// <summary>
@@ -100,11 +99,9 @@ namespace System.Management.Automation
         {
             get
             {
-                return _id;
+                return id;
             }
         }
-
-
 
         /// <summary>
         ///
@@ -133,7 +130,7 @@ namespace System.Management.Automation
         {
             get
             {
-                return _parentId;
+                return parentId;
             }
             set
             {
@@ -141,11 +138,9 @@ namespace System.Management.Automation
                 {
                     throw PSTraceSource.NewArgumentException("value", ProgressRecordStrings.ParentActivityIdCantBeActivityId);
                 }
-                _parentId = value;
+                parentId = value;
             }
         }
-
-
 
         /// <summary>
         ///
@@ -165,7 +160,7 @@ namespace System.Management.Automation
         {
             get
             {
-                return _activity;
+                return activity;
             }
             set
             {
@@ -173,11 +168,9 @@ namespace System.Management.Automation
                 {
                     throw PSTraceSource.NewArgumentException("value", ProgressRecordStrings.ArgMayNotBeNullOrEmpty, "value");
                 }
-                _activity = value;
+                activity = value;
             }
         }
-
-
 
         /// <summary>
         ///
@@ -191,7 +184,7 @@ namespace System.Management.Automation
         {
             get
             {
-                return _status;
+                return status;
             }
             set
             {
@@ -199,11 +192,9 @@ namespace System.Management.Automation
                 {
                     throw PSTraceSource.NewArgumentException("value", ProgressRecordStrings.ArgMayNotBeNullOrEmpty, "value");
                 }
-                _status = value;
+                status = value;
             }
         }
-
-
 
         /// <summary>
         ///
@@ -219,17 +210,15 @@ namespace System.Management.Automation
         {
             get
             {
-                return _currentOperation;
+                return currentOperation;
             }
             set
             {
                 // null or empty string is allowed
 
-                _currentOperation = value;
+                currentOperation = value;
             }
         }
-
-
 
         /// <summary>
         ///
@@ -244,7 +233,7 @@ namespace System.Management.Automation
         {
             get
             {
-                return _percent;
+                return percent;
             }
             set
             {
@@ -257,11 +246,9 @@ namespace System.Management.Automation
                             "value", value, ProgressRecordStrings.PercentMayNotBeMoreThan100, "PercentComplete");
                 }
 
-                _percent = value;
+                percent = value;
             }
         }
-
-
 
         /// <summary>
         ///
@@ -283,17 +270,15 @@ namespace System.Management.Automation
         {
             get
             {
-                return _secondsRemaining;
+                return secondsRemaining;
             }
             set
             {
                 // negative values are allowed
 
-                _secondsRemaining = value;
+                secondsRemaining = value;
             }
         }
-
-
 
         /// <summary>
         ///
@@ -307,7 +292,7 @@ namespace System.Management.Automation
         {
             get
             {
-                return _type;
+                return type;
             }
             set
             {
@@ -316,11 +301,9 @@ namespace System.Management.Automation
                     throw PSTraceSource.NewArgumentException("value");
                 }
 
-                _type = value;
+                type = value;
             }
         }
-
-
 
         /// <summary>
         ///
@@ -343,14 +326,14 @@ namespace System.Management.Automation
                 String.Format(
                     System.Globalization.CultureInfo.CurrentCulture,
                     "parent = {0} id = {1} act = {2} stat = {3} cur = {4} pct = {5} sec = {6} type = {7}",
-                    _parentId,
-                    _id,
-                    _activity,
-                    _status,
-                    _currentOperation,
-                    _percent,
-                    _secondsRemaining,
-                    _type);
+                    parentId,
+                    id,
+                    activity,
+                    status,
+                    currentOperation,
+                    percent,
+                    secondsRemaining,
+                    type);
         }
 
         #endregion
@@ -467,32 +450,35 @@ namespace System.Management.Automation
 
         #endregion
 
-        [DataMemberAttribute()]
-        private int _id;
+        #region DO NOT REMOVE OR RENAME THESE FIELDS - it will break remoting compatibility with Windows PowerShell
 
         [DataMemberAttribute()]
-        private int _parentId = -1;
+        private int id;
 
         [DataMemberAttribute()]
-        private string _activity;
+        private int parentId = -1;
 
         [DataMemberAttribute()]
-        private string _status;
+        private string activity;
 
         [DataMemberAttribute()]
-        private string _currentOperation;
+        private string status;
 
         [DataMemberAttribute()]
-        private int _percent = -1;
+        private string currentOperation;
 
         [DataMemberAttribute()]
-        private int _secondsRemaining = -1;
+        private int percent = -1;
 
         [DataMemberAttribute()]
-        private ProgressRecordType _type = ProgressRecordType.Processing;
+        private int secondsRemaining = -1;
+
+        [DataMemberAttribute()]
+        private ProgressRecordType type = ProgressRecordType.Processing;
+
+        #endregion
 
         #region Serialization / deserialization for remoting
-
 
         /// <summary>
         /// Creates a ProgressRecord object from a PSObject property bag.
@@ -554,8 +540,6 @@ namespace System.Management.Automation
 
         #endregion
     } //ProgressRecord
-
-
 
     /// <summary>
     ///

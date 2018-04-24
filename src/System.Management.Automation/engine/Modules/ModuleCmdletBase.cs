@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 using System.Collections;
@@ -11,6 +10,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Management.Automation;
+using System.Management.Automation.Configuration;
 using System.Management.Automation.Internal;
 using System.Management.Automation.Runspaces;
 using System.Management.Automation.Security;
@@ -88,13 +88,6 @@ namespace Microsoft.PowerShell.Commands
             /// If Scope parameter is Local, this is true.
             /// </summary>
             internal bool Local;
-
-            /// <summary>
-            /// Win8:90779
-            /// ServiceCore assembly is automatically imported as a nested module to process the NestedModules/RootModules/RequiredAssemblies fields in module manifests.
-            /// This property is set to ensure that Import-Module of a manifest module does not expose "Import-psworkflow" cmdlet.
-            ///  </summary>
-            internal bool ServiceCoreAutoAdded;
         }
 
         /// <summary>
@@ -263,11 +256,6 @@ namespace Microsoft.PowerShell.Commands
             "ModuleVersion"
         };
 
-        private static List<string> s_serviceCoreAssemblyCmdlets = new List<string>(new string[] {
-            "Microsoft.PowerShell.Workflow.ServiceCore\\Import-PSWorkflow",
-            "Microsoft.PowerShell.Workflow.ServiceCore\\New-PSWorkflowExecutionOption",
-        });
-
         private Dictionary<string, PSModuleInfo> _currentlyProcessingModules = new Dictionary<string, PSModuleInfo>();
 
         internal bool LoadUsingModulePath(bool found, IEnumerable<string> modulePath, string name, SessionState ss,
@@ -293,47 +281,49 @@ namespace Microsoft.PowerShell.Commands
             // Now search using the module path...
             foreach (string path in modulePath)
             {
-                // a name takes the form of .../moduleDir/moduleName.<ext>
-                // if only one name has been specified, then the moduleDir
-                // and moduleName are identical and repeated...
-                // Also append th ename if the path currently points at a directory
-                string qualifiedPath = Path.Combine(path, fileBaseName);
-
-                // Load the latest valid version if it is a multi-version module directory
-                module = LoadUsingMultiVersionModuleBase(qualifiedPath, manifestProcessingFlags, options, out found);
-
-                if (!found)
+#if UNIX
+                foreach (string folder in Directory.EnumerateDirectories(path))
                 {
-                    if (name.IndexOfAny(Utils.Separators.Directory) == -1)
+                    string moduleName = Path.GetFileName(folder);
+                    if (String.Compare(moduleName, fileBaseName, StringComparison.OrdinalIgnoreCase) == 0)
                     {
-                        qualifiedPath = Path.Combine(qualifiedPath, fileBaseName);
-                    }
-                    else if (Directory.Exists(qualifiedPath))
-                    {
-                        // if it points to a directory, add the basename back onto the path...
-                        qualifiedPath = Path.Combine(qualifiedPath, Path.GetFileName(fileBaseName));
-                    }
+                        fileBaseName = moduleName;
+#endif
+                        string qualifiedPath = Path.Combine(path, fileBaseName);
+                        module = LoadUsingMultiVersionModuleBase(qualifiedPath, manifestProcessingFlags, options, out found);
+                        if (!found)
+                        {
+                            if (name.IndexOfAny(Utils.Separators.Directory) == -1)
+                            {
+                                qualifiedPath = Path.Combine(qualifiedPath, fileBaseName);
+                            }
+                            else if (Utils.NativeDirectoryExists(qualifiedPath))
+                            {
+                                // if it points to a directory, add the basename back onto the path...
+                                qualifiedPath = Path.Combine(qualifiedPath, Path.GetFileName(fileBaseName));
+                            }
 
-                    module = LoadUsingExtensions(parentModule, name, qualifiedPath, extension, null, this.BasePrefix, ss, options, manifestProcessingFlags, out found);
+                            module = LoadUsingExtensions(parentModule, name, qualifiedPath, extension, null, this.BasePrefix, ss, options, manifestProcessingFlags, out found);
+                        }
+                        if (found)
+                        {
+                            break;
+                        }
+#if UNIX
+                    }
                 }
-
                 if (found)
                 {
                     break;
                 }
+#endif
             }
 
             if (found)
             {
-                // Cache the module's exported commands after importing it, or if the -Refresh flag is used on
-                // "Get-Module -List"
+                // Cache the module's exported commands after importing it, or if the -Refresh flag is used on "Get-Module -List"
                 if ((module != null) && !module.HadErrorsLoading)
                 {
-                    if (module.ExportedWorkflows != null && module.ExportedWorkflows.Count > 0 && Utils.IsRunningFromSysWOW64())
-                    {
-                        throw new NotSupportedException(AutomationExceptions.WorkflowDoesNotSupportWOW64);
-                    }
-
                     AnalysisCache.CacheModuleExports(module, Context);
                 }
             }
@@ -929,7 +919,6 @@ namespace Microsoft.PowerShell.Commands
                 //Now we resolve the possible paths in case it is relative path/path contains wildcards
                 var modulePathCollection = GetResolvedPathCollection(modulePath, this.Context);
 
-
                 if (modulePathCollection != null)
                 {
                     foreach (string resolvedModulePath in modulePathCollection)
@@ -1054,7 +1043,6 @@ namespace Microsoft.PowerShell.Commands
 
             return modules;
         }
-
 
         /// <summary>
         /// Get a list of all modules
@@ -1236,10 +1224,6 @@ namespace Microsoft.PowerShell.Commands
                         {
                             moduleInfo.SetModuleType(ModuleType.Script);
                         }
-                        else if (moduleInfo.RootModuleForManifest.EndsWith(StringLiterals.WorkflowFileExtension, StringComparison.OrdinalIgnoreCase))
-                        {
-                            moduleInfo.SetModuleType(ModuleType.Workflow);
-                        }
                         else if (moduleInfo.RootModuleForManifest.EndsWith(StringLiterals.PowerShellCmdletizationFileExtension, StringComparison.OrdinalIgnoreCase))
                         {
                             moduleInfo.SetModuleType(ModuleType.Cim);
@@ -1259,11 +1243,6 @@ namespace Microsoft.PowerShell.Commands
                 else if (extension.Equals(StringLiterals.PowerShellILAssemblyExtension, StringComparison.OrdinalIgnoreCase) || extension.Equals(StringLiterals.PowerShellNgenAssemblyExtension, StringComparison.OrdinalIgnoreCase))
                 {
                     moduleInfo.SetModuleType(ModuleType.Binary);
-                    moduleInfo.RootModule = moduleInfo.Path;
-                }
-                else if (extension.Equals(StringLiterals.WorkflowFileExtension, StringComparison.OrdinalIgnoreCase))
-                {
-                    moduleInfo.SetModuleType(ModuleType.Workflow);
                     moduleInfo.RootModule = moduleInfo.Path;
                 }
                 else if (extension.Equals(StringLiterals.PowerShellCmdletizationFileExtension))
@@ -1475,12 +1454,6 @@ namespace Microsoft.PowerShell.Commands
             // START: Check if the ModuleToProcess is already loaded..if it is, ignore the this load manifest
             // call and return
 
-            // Workflows specified in NestedModules from the manifest
-            List<string> workflowsToProcess = new List<string>();
-
-            // Workflows specified in RequiredAssemblies
-            List<string> dependentWorkflows = new List<string>();
-
             string moduleToProcess = null;
 
             if (
@@ -1541,9 +1514,8 @@ namespace Microsoft.PowerShell.Commands
 
             string actualRootModule = moduleToProcess ?? rootModule;
 
-            bool actualRootModuleIsXaml = false;
-            // For workflow modules, the actualRootModule is added to workflowsToProcess and is nulled out.
-            // We need to save this name so that we can assign this to the RootModule property of ModuleInfo
+            // If the root module is a workflow module, the 'actualRootModule' is nulled out.
+            // We need to save this name so that we can assign this to the RootModule property of ModuleInfo.
             string savedActualRootModule = actualRootModule;
 
             if (string.Equals(System.IO.Path.GetExtension(actualRootModule),
@@ -1558,9 +1530,19 @@ namespace Microsoft.PowerShell.Commands
                     throw invalidOperation;
                 }
 
-                workflowsToProcess.Add(actualRootModule);
+                if (writingErrors)
+                {
+                    message = StringUtil.Format(Modules.WorkflowModuleNotSupported, actualRootModule);
+                    WriteError(new ErrorRecord(
+                                   new NotSupportedException(message),
+                                   "Modules_WorkflowModuleNotSupported",
+                                   ErrorCategory.InvalidOperation, null));
+                }
+
+                // Null out 'actualRootModule' so don't attempt to process the file like a non-workflow module later.
                 actualRootModule = null;
-                actualRootModuleIsXaml = true;
+                containedErrors = true;
+                if (bailOnFirstError) { return null; }
             }
 
             // extract defaultCommandPrefix from the manifest
@@ -2071,7 +2053,17 @@ namespace Microsoft.PowerShell.Commands
                     if (string.Equals(System.IO.Path.GetExtension(s.Name),
                         StringLiterals.WorkflowFileExtension, StringComparison.OrdinalIgnoreCase))
                     {
-                        workflowsToProcess.Add(s.Name);
+                        if (writingErrors)
+                        {
+                            message = StringUtil.Format(Modules.WorkflowModuleNotSupported, s.Name);
+                            WriteError(new ErrorRecord(
+                                           new NotSupportedException(message),
+                                           "Modules_WorkflowModuleNotSupported",
+                                           ErrorCategory.InvalidOperation, null));
+                        }
+
+                        containedErrors = true;
+                        if (bailOnFirstError) { return null; }
                     }
                     else
                     {
@@ -2080,7 +2072,6 @@ namespace Microsoft.PowerShell.Commands
                 }
                 Array.Clear(tmpNestedModules, 0, tmpNestedModules.Length);
             }
-
 
             // Set the private data member for the module if the manifest contains
             // this member
@@ -2150,8 +2141,6 @@ namespace Microsoft.PowerShell.Commands
 
             // Indicates the ISS.Bind() should be called...
             bool doBind = false;
-            // Indicates that RunspaceConfig.Update() should be called.
-            bool doUpdate = false;
 
             // Set up to load any required assemblies that have been specified...
             List<string> tmpAssemblyList;
@@ -2171,15 +2160,7 @@ namespace Microsoft.PowerShell.Commands
                 {
                     foreach (string assembly in tmpAssemblyList)
                     {
-                        if (string.Equals(System.IO.Path.GetExtension(assembly),
-                            StringLiterals.WorkflowFileExtension, StringComparison.OrdinalIgnoreCase))
-                        {
-                            dependentWorkflows.Add(assembly);
-                        }
-                        else
-                        {
-                            assemblyList.Add(assembly);
-                        }
+                        assemblyList.Add(assembly);
                     }
                 }
 
@@ -2233,36 +2214,28 @@ namespace Microsoft.PowerShell.Commands
                         string loadMessage = StringUtil.Format(Modules.LoadingFile, "TypesToProcess", fileName);
                         WriteVerbose(loadMessage);
 
-                        if (Context.RunspaceConfiguration != null)
+                        bool isAlreadyLoaded = false;
+                        string resolvedFileName = ResolveRootedFilePath(fileName, Context) ?? fileName;
+                        foreach (var entry in Context.InitialSessionState.Types)
                         {
-                            this.Context.RunspaceConfiguration.Types.Append(new TypeConfigurationEntry(fileName));
-                            doUpdate = true;
+                            if (entry.FileName == null)
+                            {
+                                continue;
+                            }
+
+                            string resolvedEntryFileName = ResolveRootedFilePath(entry.FileName, Context) ??
+                                                            entry.FileName;
+                            if (resolvedEntryFileName.Equals(resolvedFileName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                isAlreadyLoaded = true;
+                                break;
+                            }
                         }
-                        else
+
+                        if (!isAlreadyLoaded)
                         {
-                            bool isAlreadyLoaded = false;
-                            string resolvedFileName = ResolveRootedFilePath(fileName, Context) ?? fileName;
-                            foreach (var entry in Context.InitialSessionState.Types)
-                            {
-                                if (entry.FileName == null)
-                                {
-                                    continue;
-                                }
-
-                                string resolvedEntryFileName = ResolveRootedFilePath(entry.FileName, Context) ??
-                                                               entry.FileName;
-                                if (resolvedEntryFileName.Equals(resolvedFileName, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    isAlreadyLoaded = true;
-                                    break;
-                                }
-                            }
-
-                            if (!isAlreadyLoaded)
-                            {
-                                iss.Types.Add(new SessionStateTypeEntry(fileName));
-                                doBind = true;
-                            }
+                            iss.Types.Add(new SessionStateTypeEntry(fileName));
+                            doBind = true;
                         }
                     }
                 }
@@ -2286,32 +2259,24 @@ namespace Microsoft.PowerShell.Commands
                         string loadMessage = StringUtil.Format(Modules.LoadingFile, "FormatsToProcess", fileName);
                         WriteVerbose(loadMessage);
 
-                        if (Context.RunspaceConfiguration != null)
+                        bool isAlreadyLoaded = false;
+                        foreach (var entry in Context.InitialSessionState.Formats)
                         {
-                            this.Context.RunspaceConfiguration.Formats.Append(new FormatConfigurationEntry(fileName));
-                            doUpdate = true;
+                            if (entry.FileName == null)
+                            {
+                                continue;
+                            }
+                            if (entry.FileName.Equals(fileName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                isAlreadyLoaded = true;
+                                break;
+                            }
                         }
-                        else
-                        {
-                            bool isAlreadyLoaded = false;
-                            foreach (var entry in Context.InitialSessionState.Formats)
-                            {
-                                if (entry.FileName == null)
-                                {
-                                    continue;
-                                }
-                                if (entry.FileName.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    isAlreadyLoaded = true;
-                                    break;
-                                }
-                            }
 
-                            if (!isAlreadyLoaded)
-                            {
-                                iss.Formats.Add(new SessionStateFormatEntry(fileName));
-                                doBind = true;
-                            }
+                        if (!isAlreadyLoaded)
+                        {
+                            iss.Formats.Add(new SessionStateFormatEntry(fileName));
+                            doBind = true;
                         }
                     }
                 }
@@ -2406,30 +2371,6 @@ namespace Microsoft.PowerShell.Commands
                     try
                     {
                         iss.Bind(Context, /*updateOnly*/ true);
-                    }
-                    catch (Exception e)
-                    {
-                        this.RemoveTypesAndFormatting(exportedFormatFiles, exportedTypeFiles);
-                        ErrorRecord er = new ErrorRecord(e, "FormatXmlUpdateException", ErrorCategory.InvalidOperation,
-                            null);
-                        if (bailOnFirstError)
-                        {
-                            this.ThrowTerminatingError(er);
-                        }
-                        else if (writingErrors)
-                        {
-                            this.WriteError(er);
-                        }
-                    }
-                }
-
-                // Do the runspaceconfig binding...
-                if (doUpdate)
-                {
-                    try
-                    {
-                        this.Context.CurrentRunspace.RunspaceConfiguration.Types.Update(true);
-                        this.Context.CurrentRunspace.RunspaceConfiguration.Formats.Update(true);
                     }
                     catch (Exception e)
                     {
@@ -2882,31 +2823,7 @@ namespace Microsoft.PowerShell.Commands
                     bool oldGLobal = this.BaseGlobal;
                     this.BaseGlobal = false;
 
-                    string shortModuleName = null;
-                    if (nestedModuleSpecification.Name == _serviceCoreAssemblyFullName)
-                    {
-                        shortModuleName = _serviceCoreAssemblyShortName;
-                    }
-
-                    PSModuleInfo nestedModule;
-                    if (
-                        string.Equals(nestedModuleSpecification.Name, _serviceCoreAssemblyFullName,
-                            StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(nestedModuleSpecification.Name, _serviceCoreAssemblyShortName,
-                            StringComparison.OrdinalIgnoreCase))
-                    {
-                        nestedModule = LoadServiceCoreModule(
-                            manifestInfo,
-                            moduleBase,
-                            null, //SessionState
-                            nestedModuleOptions,
-                            manifestProcessingFlags,
-                            false, // addToParentModuleIfFound
-                            out found);
-                    }
-                    else
-                    {
-                        nestedModule = LoadModuleNamedInManifest(
+                    PSModuleInfo nestedModule = LoadModuleNamedInManifest(
                             manifestInfo,
                             nestedModuleSpecification, // moduleName
                             moduleBase,
@@ -2919,8 +2836,7 @@ namespace Microsoft.PowerShell.Commands
                             true,
                             privateData,
                             out found,
-                            shortModuleName);
-                    }
+                            shortModuleName: null);
 
                     this.BaseGlobal = oldGLobal;
 
@@ -2931,27 +2847,20 @@ namespace Microsoft.PowerShell.Commands
                         // exports
                         if ((ss == null) && (nestedModule != null))
                         {
-                            // If this was ServiceCore, don't process its exports - as these
-                            // should not show up when a module defines WorkflowsToProcess
-                            if (
-                                !String.Equals(nestedModule.Name, _serviceCoreAssemblyShortName,
-                                    StringComparison.OrdinalIgnoreCase))
+                            foreach (string detectedCmdlet in nestedModule.ExportedCmdlets.Keys)
                             {
-                                foreach (string detectedCmdlet in nestedModule.ExportedCmdlets.Keys)
-                                {
-                                    manifestInfo.AddDetectedCmdletExport(detectedCmdlet);
-                                }
+                                manifestInfo.AddDetectedCmdletExport(detectedCmdlet);
+                            }
 
-                                foreach (var detectedFunction in nestedModule.ExportedFunctions.Keys)
-                                {
-                                    manifestInfo.AddDetectedFunctionExport(detectedFunction);
-                                }
+                            foreach (var detectedFunction in nestedModule.ExportedFunctions.Keys)
+                            {
+                                manifestInfo.AddDetectedFunctionExport(detectedFunction);
+                            }
 
-                                foreach (string detectedAlias in nestedModule.ExportedAliases.Keys)
-                                {
-                                    manifestInfo.AddDetectedAliasExport(detectedAlias,
-                                        nestedModule.ExportedAliases[detectedAlias].Definition);
-                                }
+                            foreach (string detectedAlias in nestedModule.ExportedAliases.Keys)
+                            {
+                                manifestInfo.AddDetectedAliasExport(detectedAlias,
+                                    nestedModule.ExportedAliases[detectedAlias].Definition);
                             }
                         }
                         // If the NestedModules was a .ps1 script no module object would have been generated
@@ -2973,75 +2882,6 @@ namespace Microsoft.PowerShell.Commands
                             ModuleIntrinsics.GetModuleName(moduleManifestPath));
                         throw invalidOperation;
                     }
-                }
-
-
-                if (actualRootModuleIsXaml)
-                {
-                    manifestInfo.SetModuleType(ModuleType.Workflow);
-                }
-
-                if (workflowsToProcess != null && workflowsToProcess.Count > 0)
-                {
-#if CORECLR // Workflow Not Supported On CSS
-                    PSNotSupportedException workflowModuleNotSupported =
-                        PSTraceSource.NewNotSupportedException(
-                            Modules.WorkflowModuleNotSupportedInPowerShellCore,
-                            ModuleIntrinsics.GetModuleName(moduleManifestPath));
-                    throw workflowModuleNotSupported;
-#else
-                    // Depending on current execution policy, check the signature of Module manifest file if required.
-                    // Reusing already created ScriptInfo object to avoid race condition when modulemanifest was not signed during first check and signed before this step.
-                    //
-                    scriptInfo.ValidateScriptInfo(Host);
-
-                    nestedModuleOptions.ServiceCoreAutoAdded = true;
-
-                    if (!importingModule)
-                    {
-                        ProcessWorkflowsToProcess(moduleBase, workflowsToProcess, new List<string>(),
-                            new List<string>(), null, manifestInfo, nestedModuleOptions);
-                    }
-                    else
-                    {
-                        // Never load nested modules to the global scope.
-                        bool oldGLobal = this.BaseGlobal;
-                        this.BaseGlobal = false;
-                        bool found = false;
-
-                        foreach (string workflowFileName in workflowsToProcess)
-                        {
-                            List<string> wfToProcess = new List<string>();
-                            wfToProcess.Add(workflowFileName);
-                            SessionState wfSS = new SessionState(Context, true, true);
-
-                            PSModuleInfo module = new PSModuleInfo(
-                                ModuleIntrinsics.GetModuleName(workflowFileName), workflowFileName, Context, wfSS);
-                            wfSS.Internal.Module = module;
-                            module.PrivateData = privateData;
-                            module.SetModuleType(ModuleType.Workflow);
-                            module.SetModuleBase(moduleBase);
-
-                            LoadServiceCoreModule(module, String.Empty, wfSS, nestedModuleOptions,
-                                manifestProcessingFlags, true, out found);
-
-                            ProcessWorkflowsToProcess(moduleBase, wfToProcess, dependentWorkflows,
-                                fixedUpAssemblyPathList, wfSS, module, nestedModuleOptions);
-
-                            // And import the members from this module into the callers context...
-                            if (importingModule)
-                            {
-                                ImportModuleMembers(module, this.BasePrefix, options);
-                            }
-
-                            // Add it to all the module tables
-                            AddModuleToModuleTables(this.Context, this.TargetSessionState.Internal, module);
-                            manifestInfo.AddNestedModule(module);
-                        }
-
-                        this.BaseGlobal = oldGLobal;
-                    }
-#endif
                 }
             }
             catch (Exception)
@@ -3382,25 +3222,10 @@ namespace Microsoft.PowerShell.Commands
                     }
                 }
 
-
                 if (newManifestInfo.DeclaredVariableExports == null ||
                     newManifestInfo.DeclaredVariableExports.Count == 0)
                 {
                     newManifestInfo.DeclaredVariableExports = manifestInfo.DeclaredVariableExports;
-                }
-
-                if (manifestInfo._detectedWorkflowExports != null)
-                {
-                    foreach (string detectedExport in manifestInfo._detectedWorkflowExports)
-                    {
-                        newManifestInfo.AddDetectedWorkflowExport(detectedExport);
-                    }
-                }
-
-                if (newManifestInfo.DeclaredWorkflowExports == null ||
-                    newManifestInfo.DeclaredWorkflowExports.Count == 0)
-                {
-                    newManifestInfo.DeclaredWorkflowExports = manifestInfo.DeclaredWorkflowExports;
                 }
 
                 // If there are types/formats entries in the ModuleToProcess use them
@@ -3442,8 +3267,8 @@ namespace Microsoft.PowerShell.Commands
                     // implicitly export functions and cmdlets.
                     if ((ss != null) && (!ss.Internal.UseExportList))
                     {
-                        ModuleIntrinsics.ExportModuleMembers(this, ss.Internal, MatchAll,
-                            MatchAll, null, null, options.ServiceCoreAutoAdded ? s_serviceCoreAssemblyCmdlets : null);
+                        ModuleIntrinsics.ExportModuleMembers(this, ss.Internal, functionPatterns: MatchAll,
+                            cmdletPatterns: MatchAll, aliasPatterns: null, variablePatterns: null, doNotExportCmdlets: null);
                     }
 
                     // Export* fields in .psd1 subset Export-ModuleMember calls from ModuleToProcess=psm1
@@ -3534,9 +3359,11 @@ namespace Microsoft.PowerShell.Commands
                     // the members of the manifest are canonical...
                     ModuleIntrinsics.ExportModuleMembers(this,
                         ss.Internal,
-                        exportedFunctions, exportedCmdlets,
-                        exportedAliases, exportedVariables,
-                        options.ServiceCoreAutoAdded ? s_serviceCoreAssemblyCmdlets : null);
+                        functionPatterns: exportedFunctions,
+                        cmdletPatterns: exportedCmdlets,
+                        aliasPatterns: exportedAliases,
+                        variablePatterns: exportedVariables,
+                        doNotExportCmdlets: null);
                 }
             }
 
@@ -3632,242 +3459,6 @@ namespace Microsoft.PowerShell.Commands
                 }
             }
         }
-
-        private readonly string _serviceCoreAssemblyFullName = "Microsoft.Powershell.Workflow.ServiceCore, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL";
-        private readonly string _serviceCoreAssemblyShortName = "Microsoft.Powershell.Workflow.ServiceCore";
-
-        private PSModuleInfo LoadServiceCoreModule(PSModuleInfo parentModule, string moduleBase, SessionState ss, ImportModuleOptions nestedModuleOptions, ManifestProcessingFlags manifestProcessingFlags, bool addToParentModuleIfFound, out bool found)
-        {
-            SessionStateInternal oldSessionState = Context.EngineSessionState;
-
-            if (ss != null)
-                Context.EngineSessionState = ss.Internal;
-
-            try
-            {
-                found = false;
-                // Never load nested modules to the global scope.
-                bool oldGLobal = this.BaseGlobal;
-                this.BaseGlobal = false;
-
-                PSModuleInfo nestedModule = LoadBinaryModule(
-                                                            parentModule,                // parentModule
-                                                            false,                       // trySnapInName
-                                                            _serviceCoreAssemblyFullName, // moduleName
-                                                            null,                        // fileName
-                                                            null,                        // assemblyToLoad
-                                                            moduleBase,                  // moduleBase
-                                                            ss,                          // SessionState
-                                                            nestedModuleOptions,         // ImportModuleOptions
-                                                            manifestProcessingFlags,     // ManifestProcessingFlags
-                                                            string.Empty,                // prefix: no -Prefix added for nested modules
-                                                            true,                        // loadTypes
-                                                            true,                        // loadFormats
-                                                            out found,                   // found
-                                                            _serviceCoreAssemblyShortName,// shortModuleName
-                                                            true                         // disableFormatUpdates
-                                                            );
-                this.BaseGlobal = oldGLobal;
-
-                // If found, add it to the parent's list of NestedModules
-                if (found)
-                {
-                    if (addToParentModuleIfFound)
-                    {
-                        parentModule.AddNestedModule(nestedModule);
-                    }
-
-                    return nestedModule;
-                }
-                else
-                {
-                    string errorMessage = StringUtil.Format(Modules.ManifestMemberNotFound, _serviceCoreAssemblyFullName, "NestedModules", parentModule.Name);
-                    FileNotFoundException fnf = new FileNotFoundException(errorMessage);
-                    PSInvalidOperationException invalidOperation = new PSInvalidOperationException(errorMessage, fnf, "Modules_ModuleFileNotFound", ErrorCategory.ResourceUnavailable, parentModule.Name);
-                    throw invalidOperation;
-                }
-            }
-            finally
-            {
-                Context.EngineSessionState = oldSessionState;
-            }
-        }
-
-#if !CORECLR // Workflow Not Supported On CSS
-        private void ProcessWorkflowsToProcess(string moduleBase, List<string> workflowsToProcess, List<string> dependentWorkflows, List<string> assemblyList, SessionState ss, PSModuleInfo manifestInfo, ImportModuleOptions options)
-        {
-            // If we are actually processing
-            if (ss != null)
-            {
-                if (workflowsToProcess != null && workflowsToProcess.Count > 0)
-                {
-                    // In ConstrainedLanguage, XAML workflows are not supported (even from a trusted FullLanguage state),
-                    // unless they are signed in-box OS binaries.
-                    if ((SystemPolicy.GetSystemLockdownPolicy() == SystemEnforcementMode.Enforce) ||
-                        (Context.LanguageMode == PSLanguageMode.ConstrainedLanguage))
-                    {
-                        // However, this static internal property can be changed by tests that can already run a script
-                        // in full-language mode.
-                        if (!SystemPolicy.XamlWorkflowSupported)
-                        {
-                            foreach (string workflowPath in ResolveWorkflowFiles(moduleBase, workflowsToProcess))
-                            {
-                                if (!SecuritySupport.IsProductBinary(workflowPath))
-                                {
-                                    throw new NotSupportedException(Modules.XamlWorkflowsNotSupported);
-                                }
-                            }
-                        }
-                    }
-
-                    SessionStateInternal oldSessionStateWF = Context.EngineSessionState;
-                    PSLanguageMode? savedLanguageMode = null;
-                    try
-                    {
-                        Context.EngineSessionState = ss.Internal;
-
-                        // Always run workflow import script as trusted since only signed in-box files can be imported
-                        // on locked down machines.
-                        if (Context.LanguageMode != PSLanguageMode.FullLanguage)
-                        {
-                            savedLanguageMode = Context.LanguageMode;
-                            Context.LanguageMode = PSLanguageMode.FullLanguage;
-                        }
-
-                        if (dependentWorkflows != null && dependentWorkflows.Count > 0)
-                        {
-                            ScriptBlock importWorkflow = ScriptBlock.Create(Context,
-                                    "param($files, $dependentFiles, $assemblyList) Microsoft.PowerShell.Workflow.ServiceCore\\Import-PSWorkflow -Path \"$files\" -DependentWorkflow $dependentFiles -DependentAssemblies $assemblyList -Force:$" + BaseForce
-                                );
-
-                            List<string> dependentFiles = new List<string>(ResolveDependentWorkflowFiles(moduleBase, dependentWorkflows));
-
-                            foreach (string workflowPath in ResolveWorkflowFiles(moduleBase, workflowsToProcess))
-                            {
-                                WriteVerbose(StringUtil.Format(Modules.LoadingWorkflow, workflowPath));
-                                importWorkflow.Invoke(workflowPath, dependentFiles.ToArray(), assemblyList.ToArray());
-                            }
-                        }
-                        else
-                        {
-                            ScriptBlock importWorkflow = ScriptBlock.Create(Context,
-                                    "param($files, $dependentFiles) Microsoft.PowerShell.Workflow.ServiceCore\\Import-PSWorkflow -Path \"$files\" -Force:$" + BaseForce
-                                );
-
-                            foreach (string workflowPath in ResolveWorkflowFiles(moduleBase, workflowsToProcess))
-                            {
-                                WriteVerbose(StringUtil.Format(Modules.LoadingWorkflow, workflowPath));
-                                importWorkflow.Invoke(workflowPath);
-                            }
-                        }
-
-                        // In the case where there are only nested modules,
-                        // the members of the manifest are canonical...
-                        ModuleIntrinsics.ExportModuleMembers(this, ss.Internal,
-                            MatchAll, MatchAll, MatchAll, MatchAll,
-                            options.ServiceCoreAutoAdded ? s_serviceCoreAssemblyCmdlets : null);
-                    }
-                    finally
-                    {
-                        Context.EngineSessionState = oldSessionStateWF;
-
-                        if (savedLanguageMode != null)
-                        {
-                            Context.LanguageMode = savedLanguageMode.Value;
-                        }
-                    }
-                }
-            }
-            else
-            {
-                if (workflowsToProcess != null)
-                {
-                    // We are in analysis
-                    foreach (string workflowToProcess in workflowsToProcess)
-                    {
-                        manifestInfo.AddDetectedWorkflowExport(System.IO.Path.GetFileNameWithoutExtension(workflowToProcess));
-                    }
-                }
-            }
-        }
-
-        private ICollection<string> ResolveWorkflowFiles(string moduleBase, List<string> workflowsToProcess)
-        {
-            Dictionary<string, string> resolvedWorkflowsToProcess = new Dictionary<string, string>();
-            foreach (string workflowToProcess in workflowsToProcess)
-            {
-                if (string.Equals(System.IO.Path.GetExtension(workflowToProcess),
-                    StringLiterals.WorkflowFileExtension, StringComparison.OrdinalIgnoreCase))
-                {
-                    string wf = workflowToProcess;
-                    if (!Path.IsPathRooted(wf))
-                    {
-                        wf = Path.Combine(moduleBase, wf);
-                    }
-
-                    foreach (string resolvedWorkflow in Context.SessionState.Path.GetResolvedProviderPathFromProviderPath(wf, Context.ProviderNames.FileSystem))
-                    {
-                        resolvedWorkflowsToProcess[resolvedWorkflow] = resolvedWorkflow;
-                    }
-                }
-                else
-                {
-                    PSInvalidOperationException invalidOperation = PSTraceSource.NewInvalidOperationException(
-                                Modules.InvalidWorkflowExtensionDuringManifestProcessing,
-                                workflowToProcess);
-                    invalidOperation.SetErrorId("Modules_InvalidWorkflowExtensionDuringManifestProcessing");
-                    throw invalidOperation;
-                }
-            }
-            return resolvedWorkflowsToProcess.Values;
-        }
-
-        private ICollection<string> ResolveDependentWorkflowFiles(string moduleBase, List<string> dependentWorkflowsToProcess)
-        {
-            Dictionary<string, string> resolvedWorkflowsToProcess = new Dictionary<string, string>();
-
-            if (dependentWorkflowsToProcess.Count == 1 && string.Equals(System.IO.Path.GetExtension(dependentWorkflowsToProcess[0]), StringLiterals.DependentWorkflowAssemblyExtension, StringComparison.OrdinalIgnoreCase))
-            {
-                string wf = dependentWorkflowsToProcess[0];
-                if (!Path.IsPathRooted(wf))
-                {
-                    wf = Path.Combine(moduleBase, wf);
-                }
-
-                resolvedWorkflowsToProcess[wf] = wf;
-            }
-            else
-            {
-                foreach (string workflowToProcess in dependentWorkflowsToProcess)
-                {
-                    if (string.Equals(System.IO.Path.GetExtension(workflowToProcess),
-                        StringLiterals.WorkflowFileExtension, StringComparison.OrdinalIgnoreCase))
-                    {
-                        string wf = workflowToProcess;
-                        if (!Path.IsPathRooted(wf))
-                        {
-                            wf = Path.Combine(moduleBase, wf);
-                        }
-
-                        foreach (string resolvedWorkflow in Context.SessionState.Path.GetResolvedProviderPathFromProviderPath(wf, Context.ProviderNames.FileSystem))
-                        {
-                            resolvedWorkflowsToProcess[resolvedWorkflow] = resolvedWorkflow;
-                        }
-                    }
-                    else
-                    {
-                        PSInvalidOperationException invalidOperation = PSTraceSource.NewInvalidOperationException(
-                                Modules.InvalidWorkflowExtensionDuringManifestProcessing,
-                                workflowToProcess);
-                        invalidOperation.SetErrorId("Modules_InvalidWorkflowExtensionDuringManifestProcessing");
-                        throw invalidOperation;
-                    }
-                }
-            }
-
-            return resolvedWorkflowsToProcess.Values;
-        }
-#endif
 
         private static void UpdateCommandCollection<T>(List<T> list, List<WildcardPattern> patterns) where T : CommandInfo
         {
@@ -4039,7 +3630,7 @@ namespace Microsoft.PowerShell.Commands
                 }
             }
 
-            // If the RequiredModule is one of the Engine modules, then they could have been loaded as snapins (using RunspaceConfiguration or InitialSessionState.CreateDefault())
+            // If the RequiredModule is one of the Engine modules, then they could have been loaded as snapins (using InitialSessionState.CreateDefault())
             if (result == null && InitialSessionState.IsEngineModule(requiredModule.Name))
             {
                 result = ModuleCmdletBase.GetEngineSnapIn(context, requiredModule.Name);
@@ -4242,7 +3833,6 @@ namespace Microsoft.PowerShell.Commands
                 {
                     powerShell.AddParameter("Version", requiredModule.Version);
                 }
-
 
                 powerShell.Invoke();
                 if (powerShell.Streams.Error != null && powerShell.Streams.Error.Count > 0)
@@ -4783,28 +4373,18 @@ namespace Microsoft.PowerShell.Commands
         {
             moduleNames = null;
             ModuleLoggingGroupPolicyStatus status = ModuleLoggingGroupPolicyStatus.Undefined;
-            Dictionary<string, object> groupPolicySettings = Utils.GetGroupPolicySetting("ModuleLogging", Utils.RegLocalMachineThenCurrentUser);
 
-            if (groupPolicySettings != null)
+            var moduleLogging = Utils.GetPolicySetting<ModuleLogging>(Utils.SystemWideThenCurrentUserConfig);
+            if (moduleLogging != null)
             {
-                object enableModuleLoggingValue = null;
-                if (groupPolicySettings.TryGetValue("EnableModuleLogging", out enableModuleLoggingValue))
+                if (moduleLogging.EnableModuleLogging == false)
                 {
-                    if (String.Equals(enableModuleLoggingValue.ToString(), "0", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return ModuleLoggingGroupPolicyStatus.Disabled;
-                    }
-
-                    if (String.Equals(enableModuleLoggingValue.ToString(), "1", StringComparison.OrdinalIgnoreCase))
-                    {
-                        status = ModuleLoggingGroupPolicyStatus.Enabled;
-
-                        object moduleNamesValue = null;
-                        if (groupPolicySettings.TryGetValue("ModuleNames", out moduleNamesValue))
-                        {
-                            moduleNames = new List<String>((string[])moduleNamesValue);
-                        }
-                    }
+                    status = ModuleLoggingGroupPolicyStatus.Disabled;
+                }
+                else if (moduleLogging.EnableModuleLogging == true)
+                {
+                    status = ModuleLoggingGroupPolicyStatus.Enabled;
+                    moduleNames = moduleLogging.ModuleNames;
                 }
             }
 
@@ -5006,7 +4586,6 @@ namespace Microsoft.PowerShell.Commands
 
             Collection<string> filePaths;
 
-
             if (context != null && context.EngineSessionState != null && context.EngineSessionState.IsProviderLoaded(context.ProviderNames.FileSystem))
             {
                 try
@@ -5043,7 +4622,6 @@ namespace Microsoft.PowerShell.Commands
             ProviderInfo provider = null;
 
             Collection<string> filePaths;
-
 
             if (context != null && context.EngineSessionState != null && context.EngineSessionState.IsProviderLoaded(context.ProviderNames.FileSystem))
             {
@@ -5082,68 +4660,18 @@ namespace Microsoft.PowerShell.Commands
         {
             try
             {
-                if (this.Context.InitialSessionState != null)
+                if (((formatFilesToRemove != null) && formatFilesToRemove.Count > 0) ||
+                    ((typeFilesToRemove != null) && typeFilesToRemove.Count > 0))
                 {
-                    if (((formatFilesToRemove != null) && formatFilesToRemove.Count > 0) ||
-                        ((typeFilesToRemove != null) && typeFilesToRemove.Count > 0))
+                    bool oldRefreshTypeFormatSetting = this.Context.InitialSessionState.RefreshTypeAndFormatSetting;
+                    try
                     {
-                        bool oldRefreshTypeFormatSetting = this.Context.InitialSessionState.RefreshTypeAndFormatSetting;
-                        try
-                        {
-                            this.Context.InitialSessionState.RefreshTypeAndFormatSetting = true;
-                            InitialSessionState.RemoveTypesAndFormats(this.Context, formatFilesToRemove, typeFilesToRemove);
-                        }
-                        finally
-                        {
-                            this.Context.InitialSessionState.RefreshTypeAndFormatSetting = oldRefreshTypeFormatSetting;
-                        }
+                        this.Context.InitialSessionState.RefreshTypeAndFormatSetting = true;
+                        InitialSessionState.RemoveTypesAndFormats(this.Context, formatFilesToRemove, typeFilesToRemove);
                     }
-                }
-                else // RunspaceConfiguration
-                {
-                    if (formatFilesToRemove != null && formatFilesToRemove.Count > 0)
+                    finally
                     {
-                        HashSet<string> formatRemoveSet = new HashSet<string>(formatFilesToRemove, StringComparer.OrdinalIgnoreCase);
-                        List<int> formatIndicesToRemove = new List<int>();
-
-                        for (int index = 0; index < this.Context.RunspaceConfiguration.Formats.Count; index++)
-                        {
-                            string fileName = Context.RunspaceConfiguration.Formats[index].FileName;
-                            if (fileName != null && formatRemoveSet.Contains(fileName))
-                            {
-                                formatIndicesToRemove.Add(index);
-                            }
-                        }
-
-                        for (int i = formatIndicesToRemove.Count - 1; i >= 0; i--)
-                        {
-                            Context.RunspaceConfiguration.Formats.RemoveItem(formatIndicesToRemove[i]);
-                        }
-
-                        this.Context.RunspaceConfiguration.Formats.Update();
-                    }
-
-                    // Remove the imported types.ps1xml files
-                    if (typeFilesToRemove != null && typeFilesToRemove.Count > 0)
-                    {
-                        HashSet<string> typeRemoveSet = new HashSet<string>(typeFilesToRemove, StringComparer.OrdinalIgnoreCase);
-                        List<int> typeIndicesToRemove = new List<int>();
-
-                        for (int index = 0; index < this.Context.RunspaceConfiguration.Types.Count; index++)
-                        {
-                            string fileName = Context.RunspaceConfiguration.Types[index].FileName;
-                            if (fileName != null && typeRemoveSet.Contains(fileName))
-                            {
-                                typeIndicesToRemove.Add(index);
-                            }
-                        }
-
-                        for (int i = typeIndicesToRemove.Count - 1; i >= 0; i--)
-                        {
-                            Context.RunspaceConfiguration.Types.RemoveItem(typeIndicesToRemove[i]);
-                        }
-
-                        this.Context.RunspaceConfiguration.Types.Update();
+                        this.Context.InitialSessionState.RefreshTypeAndFormatSetting = oldRefreshTypeFormatSetting;
                     }
                 }
             }
@@ -5250,7 +4778,6 @@ namespace Microsoft.PowerShell.Commands
                         Context.EngineSessionState.RemoveCmdletEntry(keyToRemove, true);
                     }
 
-
                     // Remove any providers imported by this module. Providers are always imported into
                     // the top level session state. Only binary modules can import providers.
                     if (module.ModuleType == ModuleType.Binary)
@@ -5269,7 +4796,7 @@ namespace Microsoft.PowerShell.Commands
                                 ProviderInfo pi = pl.Value[i];
 
                                 // If it was implemented by this module, remove it
-                                string implAssemblyLocation = pi.ImplementingType.GetTypeInfo().Assembly.Location;
+                                string implAssemblyLocation = pi.ImplementingType.Assembly.Location;
                                 if (implAssemblyLocation.Equals(module.Path, StringComparison.OrdinalIgnoreCase))
                                 {
                                     // Remove all drives from the top level session state
@@ -5913,16 +5440,13 @@ namespace Microsoft.PowerShell.Commands
                                 // implicitly export functions and cmdlets.
                                 if (!module.SessionState.Internal.UseExportList)
                                 {
-                                    ModuleIntrinsics.ExportModuleMembers(this, module.SessionState.Internal, MatchAll,
-                                        MatchAll, MatchAll, null, options.ServiceCoreAutoAdded ? ModuleCmdletBase.s_serviceCoreAssemblyCmdlets : null);
+                                    ModuleIntrinsics.ExportModuleMembers(this, module.SessionState.Internal, functionPatterns: MatchAll,
+                                        cmdletPatterns: MatchAll, aliasPatterns: MatchAll, variablePatterns: null, doNotExportCmdlets: null);
                                 }
 
                                 // Add it to the all module tables
-                                if (importingModule)
-                                {
-                                    ImportModuleMembers(module, prefix, options);
-                                    AddModuleToModuleTables(this.Context, this.TargetSessionState.Internal, module);
-                                }
+                                ImportModuleMembers(module, prefix, options);
+                                AddModuleToModuleTables(this.Context, this.TargetSessionState.Internal, module);
 
                                 found = true;
                                 if (BaseAsCustomObject)
@@ -6115,73 +5639,6 @@ namespace Microsoft.PowerShell.Commands
                         }
                     }
                 }
-                else if (ext.Equals(StringLiterals.WorkflowFileExtension, StringComparison.OrdinalIgnoreCase))
-                {
-#if CORECLR         // Workflow Not Supported On CSS
-                    PSNotSupportedException workflowModuleNotSupported =
-                        PSTraceSource.NewNotSupportedException(
-                            Modules.WorkflowModuleNotSupportedInPowerShellCore,
-                            ModuleIntrinsics.GetModuleName(fileName));
-                    throw workflowModuleNotSupported;
-#else
-                    if (Utils.IsRunningFromSysWOW64())
-                    {
-                        throw new NotSupportedException(AutomationExceptions.WorkflowDoesNotSupportWOW64);
-                    }
-
-                    scriptInfo = GetScriptInfoForFile(fileName, out scriptName, true);
-
-                    ImportModuleOptions nestedModuleOptions = new ImportModuleOptions();
-                    List<string> wfToProcess = new List<string>();
-                    wfToProcess.Add(fileName);
-
-                    found = true;
-
-                    if (!importingModule)
-                    {
-                        module = new PSModuleInfo(ModuleIntrinsics.GetModuleName(fileName), fileName, null, null);
-
-                        ProcessWorkflowsToProcess(moduleBase, wfToProcess, new List<string>(), new List<string>(), null, module, nestedModuleOptions);
-                    }
-                    else
-                    {
-                        if (ss == null)
-                        {
-                            ss = new SessionState(Context, true, true);
-                        }
-
-                        module = new PSModuleInfo(ModuleIntrinsics.GetModuleName(fileName), fileName, Context, ss);
-                        ss.Internal.Module = module;
-                        module.PrivateData = privateData;
-                        module.SetModuleType(ModuleType.Workflow);
-                        module.SetModuleBase(moduleBase);
-
-                        nestedModuleOptions.ServiceCoreAutoAdded = true;
-
-                        LoadServiceCoreModule(module, String.Empty, ss, nestedModuleOptions, manifestProcessingFlags, true, out found);
-
-                        ProcessWorkflowsToProcess(moduleBase, wfToProcess, new List<string>(), new List<string>(), ss, module, nestedModuleOptions);
-
-                        // And import the members from this module into the callers context...
-                        if (importingModule)
-                        {
-                            ImportModuleMembers(module, prefix, options);
-                        }
-
-                        // Add it to all the module tables
-                        AddModuleToModuleTables(this.Context, this.TargetSessionState.Internal, module);
-                    }
-
-                    if (BaseAsCustomObject)
-                    {
-                        WriteObject(module.AsCustomObject());
-                    }
-                    else if (BasePassThru)
-                    {
-                        WriteObject(module);
-                    }
-#endif
-                }
                 else if (ext.Equals(StringLiterals.PowerShellCmdletizationFileExtension, StringComparison.OrdinalIgnoreCase))
                 {
                     found = true;
@@ -6260,13 +5717,22 @@ namespace Microsoft.PowerShell.Commands
                         }
                     }
                 }
+                else if (ext.Equals(StringLiterals.WorkflowFileExtension, StringComparison.OrdinalIgnoreCase))
+                {
+                    found = true;
+                    message = StringUtil.Format(Modules.WorkflowModuleNotSupported, fileName);
+                    WriteError(new ErrorRecord(
+                                   new NotSupportedException(message),
+                                   "Modules_WorkflowModuleNotSupported",
+                                   ErrorCategory.InvalidOperation, null));
+                }
                 else
                 {
                     found = true;
                     message = StringUtil.Format(Modules.InvalidModuleExtension, ext, fileName);
                     InvalidOperationException invalidOp = new InvalidOperationException(message);
                     ErrorRecord er = new ErrorRecord(invalidOp, "Modules_InvalidModuleExtension",
-                        ErrorCategory.PermissionDenied, null);
+                        ErrorCategory.InvalidOperation, null);
                     WriteError(er);
                 }
             }
@@ -6445,7 +5911,6 @@ namespace Microsoft.PowerShell.Commands
             }
         }
 
-
         private static void AnalyzeSnapinDomainHelper()
         {
             String path = (string)AppDomain.CurrentDomain.GetData("PathToProcess");
@@ -6556,10 +6021,6 @@ namespace Microsoft.PowerShell.Commands
                         if ((commandType & CommandTypes.Alias) == CommandTypes.Alias)
                         {
                             module.AddDetectedAliasExport(commandName, null);
-                        }
-                        if ((commandType & CommandTypes.Workflow) == CommandTypes.Workflow)
-                        {
-                            module.AddDetectedWorkflowExport(commandName);
                         }
                         if ((commandType & CommandTypes.Function) == CommandTypes.Function)
                         {
@@ -7181,15 +6642,8 @@ namespace Microsoft.PowerShell.Commands
                         WriteError(cnfe.ErrorRecord);
                     }
 
-                    // WIN8: 561104 Importing PSWorkflow module tells wrongly that their is a cmdlet Import-PSWorkflow, when there is none
-                    // Skipping the verbose message when cmdlet name is import-psworkflow
-                    //
-                    if (!String.Equals(ssce.Name, "import-psworkflow", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string message = StringUtil.Format(ssce.CommandType == CommandTypes.Alias ? Modules.ImportingAlias : Modules.ImportingCmdlet, ssce.Name);
-
-                        WriteVerbose(message);
-                    }
+                    string message = StringUtil.Format(ssce.CommandType == CommandTypes.Alias ? Modules.ImportingAlias : Modules.ImportingCmdlet, ssce.Name);
+                    WriteVerbose(message);
                 }
                 else
                 {
@@ -7523,12 +6977,7 @@ namespace Microsoft.PowerShell.Commands
             {
                 foreach (FunctionInfo func in sourceModule.ExportedFunctions.Values)
                 {
-                    ImportFunctionsOrWorkflows(func, targetSessionState, sourceModule, functionPatterns, noPatternsSpecified, prefix, options, usePrefix, ref checkVerb, ref checkNoun, original2prefixedName, cmdlet, isImportModulePrivate, isFunction: true);
-                }
-
-                foreach (FunctionInfo func in sourceModule.ExportedWorkflows.Values)
-                {
-                    ImportFunctionsOrWorkflows(func, targetSessionState, sourceModule, functionPatterns, noPatternsSpecified, prefix, options, usePrefix, ref checkVerb, ref checkNoun, original2prefixedName, cmdlet, isImportModulePrivate, isFunction: false);
+                    ImportFunctions(func, targetSessionState, sourceModule, functionPatterns, noPatternsSpecified, prefix, options, usePrefix, ref checkVerb, ref checkNoun, original2prefixedName, cmdlet, isImportModulePrivate, isFunction: true);
                 }
 
                 // Import any exported variables...
@@ -7609,7 +7058,7 @@ namespace Microsoft.PowerShell.Commands
             }
         }
 
-        private static void ImportFunctionsOrWorkflows(FunctionInfo func, SessionStateInternal targetSessionState, PSModuleInfo sourceModule, List<WildcardPattern> functionPatterns, bool noPatternsSpecified,
+        private static void ImportFunctions(FunctionInfo func, SessionStateInternal targetSessionState, PSModuleInfo sourceModule, List<WildcardPattern> functionPatterns, bool noPatternsSpecified,
             string prefix, ImportModuleOptions options, bool usePrefix, ref bool checkVerb, ref bool checkNoun, Dictionary<string, string> original2prefixedName, ModuleCmdletBase cmdlet, bool isImportModulePrivate, bool isFunction)
         {
             string message = null;
@@ -7647,19 +7096,10 @@ namespace Microsoft.PowerShell.Commands
                 }
 
                 ValidateCommandName(cmdlet, functionInfo.Name, sourceModule.Name, ref checkNoun, ref checkVerb);
-
-                if (func.CommandType == CommandTypes.Workflow)
-                {
-                    message = StringUtil.Format(Modules.ImportingWorkflow, prefixedName);
-                }
-                else
-                {
-                    message = StringUtil.Format(Modules.ImportingFunction, prefixedName);
-                }
+                message = StringUtil.Format(Modules.ImportingFunction, prefixedName);
                 cmdlet.WriteVerbose(message);
             }
         }
-
 
         private static void SetCommandVisibility(bool isImportModulePrivate, CommandInfo command)
         {

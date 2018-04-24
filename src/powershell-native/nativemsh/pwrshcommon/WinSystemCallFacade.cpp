@@ -1,7 +1,7 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 // ----------------------------------------------------------------------
-//
-//  Microsoft Windows NT
-//  Copyright (C) Microsoft Corporation, 2014.
 //
 //  File:      WinSystemCallFacade.h
 //
@@ -11,7 +11,7 @@
 
 #include "WinSystemCallFacade.h"
 
-namespace NativeMsh 
+namespace NativeMsh
 {
     HMODULE WINAPI WinSystemCallFacade::LoadLibraryExW(
         _In_        LPCWSTR lpFileName,

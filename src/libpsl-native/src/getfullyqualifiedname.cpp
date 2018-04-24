@@ -1,5 +1,6 @@
-//! @file getfullyqualifiedname.cpp
-//! @author George Fleming <v-geflem@microsoft.com>
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 //! @brief Implements GetFullyQualifiedName on Linux
 
 #include "getcomputername.h"
@@ -43,7 +44,7 @@ char *GetFullyQualifiedName()
     }
 
     // return the first canonical name in the list
-    fullName = strndup(info->ai_canonname, strlen(info->ai_canonname));
+    fullName = strndup(info->ai_canonname, strnlen(info->ai_canonname, NI_MAXHOST));
 
     // only free info if getaddrinfo was successful
     freeaddrinfo(info);

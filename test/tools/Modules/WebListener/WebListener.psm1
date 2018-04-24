@@ -1,12 +1,16 @@
-Class WebListener 
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+Class WebListener
 {
     [int]$HttpPort
     [int]$HttpsPort
+    [int]$Tls11Port
+    [int]$TlsPort
     [System.Management.Automation.Job]$Job
 
     WebListener () { }
 
-    [String] GetStatus() 
+    [String] GetStatus()
     {
         return $This.Job.JobStateInfo.State
     }
@@ -14,32 +18,38 @@ Class WebListener
 
 [WebListener]$WebListener
 
-function Get-WebListener 
+function Get-WebListener
 {
     [CmdletBinding(ConfirmImpact = 'Low')]
     [OutputType([WebListener])]
     param()
 
-    process 
+    process
     {
         return [WebListener]$Script:WebListener
     }
 }
 
-function Start-WebListener 
+function Start-WebListener
 {
     [CmdletBinding(ConfirmImpact = 'Low')]
     [OutputType([WebListener])]
-    param 
+    param
     (
         [ValidateRange(1,65535)]
         [int]$HttpPort = 8083,
 
         [ValidateRange(1,65535)]
-        [int]$HttpsPort = 8084
+        [int]$HttpsPort = 8084,
+
+        [ValidateRange(1,65535)]
+        [int]$Tls11Port = 8085,
+
+        [ValidateRange(1,65535)]
+        [int]$TlsPort = 8086
     )
-    
-    process 
+
+    process
     {
         $runningListener = Get-WebListener
         if ($null -ne $runningListener -and $runningListener.GetStatus() -eq 'Running')
@@ -52,45 +62,63 @@ function Start-WebListener
         $serverPfx           = 'ServerCert.pfx'
         $serverPfxPassword   = 'password'
         $initCompleteMessage = 'Now listening on'
-        
+        $sleepMilliseconds   = 100
+
         $serverPfxPath = Join-Path $MyInvocation.MyCommand.Module.ModuleBase $serverPfx
-        $timeOut = (get-date).AddSeconds($initTimeoutSeconds)
         $Job = Start-Job {
-            $path = Split-Path -parent (get-command WebListener).Path
-            Push-Location $path
-            dotnet $using:appDll $using:serverPfxPath $using:serverPfxPassword $using:HttpPort $using:HttpsPort
+            $path = Split-Path -parent (get-command WebListener).Path -Verbose
+            Push-Location $path -Verbose
+            'appDLL: {0}' -f $using:appDll
+            'serverPfxPath: {0}' -f $using:serverPfxPath
+            'serverPfxPassword: {0}' -f $using:serverPfxPassword
+            'HttpPort: {0}' -f $using:HttpPort
+            'Https: {0}' -f $using:HttpsPort
+            'Tls11Port: {0}' -f $using:Tls11Port
+            'TlsPort: {0}' -f $using:TlsPort
+            $env:ASPNETCORE_ENVIRONMENT = 'Development'
+            dotnet $using:appDll $using:serverPfxPath $using:serverPfxPassword $using:HttpPort $using:HttpsPort $using:Tls11Port $using:TlsPort
         }
         $Script:WebListener = [WebListener]@{
-            HttpPort  = $HttpPort 
+            HttpPort  = $HttpPort
             HttpsPort = $HttpsPort
+            Tls11Port = $Tls11Port
+            TlsPort   = $TlsPort
             Job       = $Job
         }
-        # Wait until the app is running or until the initTimeoutSeconds have been reached
+
+        # Count iterations of $sleepMilliseconds instead of using system time to work around possible CI VM sleep/delays
+        $sleepCountRemaining = $initTimeoutSeconds * 1000 / $sleepMilliseconds
         do
         {
-            Start-Sleep -Milliseconds 100
+            Start-Sleep -Milliseconds $sleepMilliseconds
             $initStatus = $Job.ChildJobs[0].Output | Out-String
             $isRunning = $initStatus -match $initCompleteMessage
+            $sleepCountRemaining--
         }
-        while (-not $isRunning -and (get-date) -lt $timeOut)
-    
-        if (-not $isRunning) 
+        while (-not $isRunning -and $sleepCountRemaining -gt 0)
+
+        if (-not $isRunning)
         {
-            $Job | Stop-Job -PassThru | Receive-Job
-            $Job | Remove-Job
-            throw 'WebListener did not start before the timeout was reached.'
+            $jobErrors = $Job.ChildJobs[0].Error | Out-String
+            $jobOutput =  $Job.ChildJobs[0].Output | Out-String
+            $jobVerbose =  $Job.ChildJobs[0].Verbose | Out-String
+            $Job | Stop-Job
+            $Job | Remove-Job -Force
+            $message = 'WebListener did not start before the timeout was reached.{0}Errors:{0}{1}{0}Output:{0}{2}{0}Verbose:{0}{3}' -f
+                ([System.Environment]::NewLine), $jobErrors, $jobOutput, $jobVerbose
+            throw $message
         }
         return $Script:WebListener
     }
 }
 
-function Stop-WebListener 
+function Stop-WebListener
 {
     [CmdletBinding(ConfirmImpact = 'Low')]
     [OutputType([Void])]
     param()
-    
-    process 
+
+    process
     {
         $Script:WebListener.job | Stop-Job -PassThru | Remove-Job
         $Script:WebListener = $null
@@ -112,20 +140,35 @@ function Get-WebListenerUrl {
     [OutputType([Uri])]
     param (
         [switch]$Https,
+
+        [ValidateSet('Default', 'Tls12', 'Tls11', 'Tls')]
+        [string]$SslProtocol = 'Default',
+
         [ValidateSet(
+            'Auth',
             'Cert',
             'Compression',
             'Delay',
+            'Delete',
             'Encoding',
             'Get',
             'Home',
+            'Link',
             'Multipart',
+            'Patch',
+            'Post',
+            'Put',
             'Redirect',
+            'Response',
+            'ResponseHeaders',
+            'Resume',
             '/'
         )]
         [String]$Test,
 
-        [String]$TestValue
+        [String]$TestValue,
+
+        [System.Collections.IDictionary]$Query
     )
     process {
         $runningListener = Get-WebListener
@@ -134,12 +177,20 @@ function Get-WebListenerUrl {
             return $null
         }
         $Uri = [System.UriBuilder]::new()
-        $Uri.Host = 'localhost'
+        # Use 127.0.0.1 and not localhost due to https://github.com/dotnet/corefx/issues/24104
+        $Uri.Host = '127.0.0.1'
         $Uri.Port = $runningListener.HttpPort
         $Uri.Scheme = 'Http'
+
         if ($Https.IsPresent)
         {
-            $Uri.Port = $runningListener.HttpsPort
+            switch ($SslProtocol)
+            {
+                'Tls11' { $Uri.Port = $runningListener.Tls11Port }
+                'Tls'   { $Uri.Port = $runningListener.TlsPort }
+                # The base HTTPs port is configured for Tls12 only
+                default { $Uri.Port = $runningListener.HttpsPort }
+            }
             $Uri.Scheme = 'Https'
         }
 
@@ -147,10 +198,19 @@ function Get-WebListenerUrl {
         {
             $Uri.Path = '{0}/{1}' -f $Test, $TestValue
         }
-        else 
+        else
         {
             $Uri.Path = $Test
         }
+        $StringBuilder = [System.Text.StringBuilder]::new()
+        foreach ($key in $Query.Keys)
+        {
+            $null = $StringBuilder.Append([System.Net.WebUtility]::UrlEncode($key))
+            $null = $StringBuilder.Append('=')
+            $null = $StringBuilder.Append([System.Net.WebUtility]::UrlEncode($Query[$key].ToString()))
+            $null = $StringBuilder.Append('&')
+        }
+        $Uri.Query = $StringBuilder.ToString()
 
         return [Uri]$Uri.ToString()
     }

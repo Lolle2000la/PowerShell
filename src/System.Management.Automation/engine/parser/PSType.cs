@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -16,10 +15,11 @@ namespace System.Management.Automation.Language
 {
     internal class TypeDefiner
     {
+        internal const string DynamicClassAssemblyName = "PowerShell Class Assembly";
+
         private static int s_globalCounter = 0;
-        private static readonly object[] s_emptyArgArray = Utils.EmptyArray<object>();
         private static readonly CustomAttributeBuilder s_hiddenCustomAttributeBuilder =
-            new CustomAttributeBuilder(typeof(HiddenAttribute).GetConstructor(Type.EmptyTypes), s_emptyArgArray);
+            new CustomAttributeBuilder(typeof(HiddenAttribute).GetConstructor(Type.EmptyTypes), Utils.EmptyArray<object>());
 
         private static readonly string s_sessionStateKeeperFieldName = "__sessionStateKeeper";
         internal static readonly string SessionStateFieldName = "__sessionState";
@@ -36,7 +36,10 @@ namespace System.Management.Automation.Language
             }
             if (!LanguagePrimitives.TryConvertTo(arg, type, out result))
             {
-                parser.ReportError(errorExtent, () => ParserStrings.CannotConvertValue, ToStringCodeMethods.Type(type));
+                parser.ReportError(errorExtent,
+                    nameof(ParserStrings.CannotConvertValue),
+                    ParserStrings.CannotConvertValue,
+                    ToStringCodeMethods.Type(type));
                 return false;
             }
             return true;
@@ -48,8 +51,8 @@ namespace System.Management.Automation.Language
             Diagnostics.Assert(attributeType != null, "Semantic checks should have verified attribute type exists");
 
             Diagnostics.Assert(
-                attributeType.GetTypeInfo().GetCustomAttribute<AttributeUsageAttribute>(true) == null ||
-                (attributeType.GetTypeInfo().GetCustomAttribute<AttributeUsageAttribute>(true).ValidOn & attributeTargets) != 0, "Semantic checks should have verified attribute usage");
+                attributeType.GetCustomAttribute<AttributeUsageAttribute>(true) == null ||
+                (attributeType.GetCustomAttribute<AttributeUsageAttribute>(true).ValidOn & attributeTargets) != 0, "Semantic checks should have verified attribute usage");
 
             var positionalArgs = new object[attributeAst.PositionalArguments.Count];
             var cvv = new ConstantValueVisitor { AttributeArgument = false };
@@ -307,7 +310,10 @@ namespace System.Management.Automation.Language
 
                     if (firstBaseTypeAst.TypeName.IsArray)
                     {
-                        parser.ReportError(firstBaseTypeAst.Extent, () => ParserStrings.SubtypeArray, firstBaseTypeAst.TypeName.FullName);
+                        parser.ReportError(firstBaseTypeAst.Extent,
+                            nameof(ParserStrings.SubtypeArray),
+                            ParserStrings.SubtypeArray,
+                            firstBaseTypeAst.TypeName.FullName);
                         // fall to the default base type
                     }
                     else
@@ -315,25 +321,34 @@ namespace System.Management.Automation.Language
                         baseClass = firstBaseTypeAst.TypeName.GetReflectionType();
                         if (baseClass == null)
                         {
-                            parser.ReportError(firstBaseTypeAst.Extent, () => ParserStrings.TypeNotFound, firstBaseTypeAst.TypeName.FullName);
+                            parser.ReportError(firstBaseTypeAst.Extent,
+                                nameof(ParserStrings.TypeNotFound),
+                                ParserStrings.TypeNotFound,
+                                firstBaseTypeAst.TypeName.FullName);
                             // fall to the default base type
                         }
                         else
 
                         {
-                            if (baseClass.GetTypeInfo().IsSealed)
+                            if (baseClass.IsSealed)
                             {
-                                parser.ReportError(firstBaseTypeAst.Extent, () => ParserStrings.SealedBaseClass, baseClass.Name);
+                                parser.ReportError(firstBaseTypeAst.Extent,
+                                    nameof(ParserStrings.SealedBaseClass),
+                                    ParserStrings.SealedBaseClass,
+                                    baseClass.Name);
                                 // ignore base type if it's sealed.
                                 baseClass = null;
                             }
-                            else if (baseClass.GetTypeInfo().IsGenericType && !baseClass.IsConstructedGenericType)
+                            else if (baseClass.IsGenericType && !baseClass.IsConstructedGenericType)
                             {
-                                parser.ReportError(firstBaseTypeAst.Extent, () => ParserStrings.SubtypeUnclosedGeneric, baseClass.Name);
+                                parser.ReportError(firstBaseTypeAst.Extent,
+                                    nameof(ParserStrings.SubtypeUnclosedGeneric),
+                                    ParserStrings.SubtypeUnclosedGeneric,
+                                    baseClass.Name);
                                 // ignore base type, we cannot inherit from unclosed generic.
                                 baseClass = null;
                             }
-                            else if (baseClass.GetTypeInfo().IsInterface)
+                            else if (baseClass.IsInterface)
                             {
                                 // First Ast can represent interface as well as BaseClass.
                                 interfaces.Add(baseClass);
@@ -361,7 +376,10 @@ namespace System.Management.Automation.Language
                     {
                         if (baseTypeAsts[i].TypeName.IsArray)
                         {
-                            parser.ReportError(baseTypeAsts[i].Extent, () => ParserStrings.SubtypeArray, baseTypeAsts[i].TypeName.FullName);
+                            parser.ReportError(baseTypeAsts[i].Extent,
+                                nameof(ParserStrings.SubtypeArray),
+                                ParserStrings.SubtypeArray,
+                                baseTypeAsts[i].TypeName.FullName);
                             this.HasFatalErrors = true;
                         }
                     }
@@ -370,24 +388,33 @@ namespace System.Management.Automation.Language
                     {
                         if (baseTypeAsts[i].TypeName.IsArray)
                         {
-                            parser.ReportError(baseTypeAsts[i].Extent, () => ParserStrings.SubtypeArray, baseTypeAsts[i].TypeName.FullName);
+                            parser.ReportError(baseTypeAsts[i].Extent,
+                                nameof(ParserStrings.SubtypeArray),
+                                ParserStrings.SubtypeArray,
+                                baseTypeAsts[i].TypeName.FullName);
                         }
                         else
                         {
                             Type interfaceType = baseTypeAsts[i].TypeName.GetReflectionType();
                             if (interfaceType == null)
                             {
-                                parser.ReportError(baseTypeAsts[i].Extent, () => ParserStrings.TypeNotFound, baseTypeAsts[i].TypeName.FullName);
+                                parser.ReportError(baseTypeAsts[i].Extent,
+                                    nameof(ParserStrings.TypeNotFound),
+                                    ParserStrings.TypeNotFound,
+                                    baseTypeAsts[i].TypeName.FullName);
                             }
                             else
                             {
-                                if (interfaceType.GetTypeInfo().IsInterface)
+                                if (interfaceType.IsInterface)
                                 {
                                     interfaces.Add(interfaceType);
                                 }
                                 else
                                 {
-                                    parser.ReportError(baseTypeAsts[i].Extent, () => ParserStrings.InterfaceNameExpected, interfaceType.Name);
+                                    parser.ReportError(baseTypeAsts[i].Extent,
+                                        nameof(ParserStrings.InterfaceNameExpected),
+                                        ParserStrings.InterfaceNameExpected,
+                                        interfaceType.Name);
                                 }
                             }
                         }
@@ -494,7 +521,10 @@ namespace System.Management.Automation.Language
                 {
                     if (!instanceCtors.Any())
                     {
-                        _parser.ReportError(_typeDefinitionAst.Extent, () => ParserStrings.BaseClassNoDefaultCtor, _typeBuilder.BaseType.Name);
+                        _parser.ReportError(_typeDefinitionAst.Extent,
+                            nameof(ParserStrings.BaseClassNoDefaultCtor),
+                            ParserStrings.BaseClassNoDefaultCtor,
+                            _typeBuilder.BaseType.Name);
                         this.HasFatalErrors = true;
                     }
                 }
@@ -504,7 +534,10 @@ namespace System.Management.Automation.Language
             {
                 if (_definedProperties.ContainsKey(propertyMemberAst.Name))
                 {
-                    _parser.ReportError(propertyMemberAst.Extent, () => ParserStrings.MemberAlreadyDefined, propertyMemberAst.Name);
+                    _parser.ReportError(propertyMemberAst.Extent,
+                        nameof(ParserStrings.MemberAlreadyDefined),
+                        ParserStrings.MemberAlreadyDefined,
+                        propertyMemberAst.Name);
                     return;
                 }
 
@@ -587,7 +620,7 @@ namespace System.Management.Automation.Language
                     setIlGen.Emit(OpCodes.Call, typeof(Type).GetMethod("GetTypeFromHandle")); // load current Type on stack
                     setIlGen.Emit(OpCodes.Ldstr, propertyMemberAst.Name); // load name of Property
                     setIlGen.Emit(propertyMemberAst.IsStatic ? OpCodes.Ldarg_0 : OpCodes.Ldarg_1); // load set value
-                    if (type.GetTypeInfo().IsValueType)
+                    if (type.IsValueType)
                     {
                         setIlGen.Emit(OpCodes.Box, type);
                     }
@@ -658,7 +691,9 @@ namespace System.Management.Automation.Language
                                 !functionMemberAst.IsConstructor)
                             {
                                 _parser.ReportError(functionMemberAst.NameExtent ?? functionMemberAst.Extent,
-                                    () => ParserStrings.MemberAlreadyDefined, functionMemberAst.Name);
+                                    nameof(ParserStrings.MemberAlreadyDefined),
+                                    ParserStrings.MemberAlreadyDefined,
+                                    functionMemberAst.Name);
                                 return true;
                             }
                         }
@@ -687,12 +722,17 @@ namespace System.Management.Automation.Language
                                         : typeof(object);
                     if (paramType == null)
                     {
-                        _parser.ReportError(typeConstraint.Extent, () => ParserStrings.TypeNotFound, typeConstraint.TypeName.FullName);
+                        _parser.ReportError(typeConstraint.Extent,
+                            nameof(ParserStrings.TypeNotFound),
+                            ParserStrings.TypeNotFound,
+                            typeConstraint.TypeName.FullName);
                         anyErrors = true;
                     }
-                    else if (paramType == typeof(void) || paramType.GetTypeInfo().IsGenericTypeDefinition)
+                    else if (paramType == typeof(void) || paramType.IsGenericTypeDefinition)
                     {
-                        _parser.ReportError(typeConstraint.Extent, () => ParserStrings.TypeNotAllowedForParameter,
+                        _parser.ReportError(typeConstraint.Extent,
+                            nameof(ParserStrings.TypeNotAllowedForParameter),
+                            ParserStrings.TypeNotAllowedForParameter,
                             typeConstraint.TypeName.FullName);
                         anyErrors = true;
                     }
@@ -735,7 +775,10 @@ namespace System.Management.Automation.Language
                         var parameters = functionMemberAst.Parameters;
                         if (parameters.Count > 0)
                         {
-                            _parser.ReportError(Parser.ExtentOf(parameters.First(), parameters.Last()), () => ParserStrings.StaticConstructorCantHaveParameters);
+                            IScriptExtent errorExtent = Parser.ExtentOf(parameters.First(), parameters.Last());
+                            _parser.ReportError(errorExtent,
+                                nameof(ParserStrings.StaticConstructorCantHaveParameters),
+                                ParserStrings.StaticConstructorCantHaveParameters);
                             return;
                         }
                         methodAttributes |= Reflection.MethodAttributes.Static;
@@ -763,7 +806,10 @@ namespace System.Management.Automation.Language
                 var returnType = functionMemberAst.GetReturnType();
                 if (returnType == null)
                 {
-                    _parser.ReportError(functionMemberAst.ReturnType.Extent, () => ParserStrings.TypeNotFound, functionMemberAst.ReturnType.TypeName.FullName);
+                    _parser.ReportError(functionMemberAst.ReturnType.Extent,
+                        nameof(ParserStrings.TypeNotFound),
+                        ParserStrings.TypeNotFound,
+                        functionMemberAst.ReturnType.TypeName.FullName);
                     return;
                 }
                 var method = _typeBuilder.DefineMethod(functionMemberAst.Name, attributes, returnType, parameterTypes);
@@ -854,7 +900,7 @@ namespace System.Management.Automation.Language
                         ilGenerator.Emit(OpCodes.Ldloc, local);           // load array
                         EmitLdc(ilGenerator, i);                          // index to save at
                         EmitLdarg(ilGenerator, j);                        // load argument (skipping this)
-                        if (parameterTypes[i].GetTypeInfo().IsValueType)  // value types must be boxed
+                        if (parameterTypes[i].IsValueType)  // value types must be boxed
                         {
                             ilGenerator.Emit(OpCodes.Box, parameterTypes[i]);
                         }
@@ -1019,7 +1065,9 @@ namespace System.Management.Automation.Language
                     {
                         if (!result.Contains(helper))
                         {
-                            parser.ReportError(helper._enumDefinitionAst.Extent, () => ParserStrings.CycleInEnumInitializers);
+                            parser.ReportError(helper._enumDefinitionAst.Extent,
+                                nameof(ParserStrings.CycleInEnumInitializers),
+                                ParserStrings.CycleInEnumInitializers);
                         }
                     }
                 }
@@ -1057,11 +1105,15 @@ namespace System.Management.Automation.Language
                                     if (constValue != null &&
                                         LanguagePrimitives.IsNumeric(LanguagePrimitives.GetTypeCode(constValue.GetType())))
                                     {
-                                        _parser.ReportError(enumerator.InitialValue.Extent, () => ParserStrings.EnumeratorValueTooLarge);
+                                        _parser.ReportError(enumerator.InitialValue.Extent,
+                                            nameof(ParserStrings.EnumeratorValueTooLarge),
+                                            ParserStrings.EnumeratorValueTooLarge);
                                     }
                                     else
                                     {
-                                        _parser.ReportError(enumerator.InitialValue.Extent, () => ParserStrings.CannotConvertValue,
+                                        _parser.ReportError(enumerator.InitialValue.Extent,
+                                            nameof(ParserStrings.CannotConvertValue),
+                                            ParserStrings.CannotConvertValue,
                                             ToStringCodeMethods.Type(typeof(int)));
                                     }
                                 }
@@ -1069,17 +1121,24 @@ namespace System.Management.Automation.Language
                         }
                         else
                         {
-                            _parser.ReportError(enumerator.InitialValue.Extent, () => ParserStrings.EnumeratorValueMustBeConstant);
+                            _parser.ReportError(enumerator.InitialValue.Extent,
+                                nameof(ParserStrings.EnumeratorValueMustBeConstant),
+                                ParserStrings.EnumeratorValueMustBeConstant);
                         }
                     }
                     else if (valueTooBig)
                     {
-                        _parser.ReportError(enumerator.Extent, () => ParserStrings.EnumeratorValueTooLarge);
+                        _parser.ReportError(enumerator.Extent,
+                            nameof(ParserStrings.EnumeratorValueTooLarge),
+                            ParserStrings.EnumeratorValueTooLarge);
                     }
 
                     if (definedEnumerators.Contains(enumerator.Name))
                     {
-                        _parser.ReportError(enumerator.Extent, () => ParserStrings.MemberAlreadyDefined, enumerator.Name);
+                        _parser.ReportError(enumerator.Extent,
+                            nameof(ParserStrings.MemberAlreadyDefined),
+                            ParserStrings.MemberAlreadyDefined,
+                            enumerator.Name);
                     }
                     else
                     {
@@ -1100,30 +1159,40 @@ namespace System.Management.Automation.Language
             }
         }
 
-        private static IEnumerable<CustomAttributeBuilder> GetAssemblyAttributeBuilders()
+        private static IEnumerable<CustomAttributeBuilder> GetAssemblyAttributeBuilders(string scriptFile)
         {
-            yield return new CustomAttributeBuilder(typeof(DynamicClassImplementationAssemblyAttribute).GetConstructor(Type.EmptyTypes), s_emptyArgArray);
+            var ctor = typeof(DynamicClassImplementationAssemblyAttribute).GetConstructor(Type.EmptyTypes);
+            var emptyArgs = Utils.EmptyArray<object>();
+
+            if (string.IsNullOrEmpty(scriptFile)) {
+                yield return new CustomAttributeBuilder(ctor, emptyArgs);
+                yield break;
+            }
+
+            var propertyInfo = new PropertyInfo[] {
+                typeof(DynamicClassImplementationAssemblyAttribute).GetProperty(nameof(DynamicClassImplementationAssemblyAttribute.ScriptFile)) };
+            var propertyArgs = new object[] { scriptFile };
+
+            yield return new CustomAttributeBuilder(ctor, emptyArgs,
+                propertyInfo, propertyArgs, Utils.EmptyArray<FieldInfo>(), emptyArgs);
+
         }
 
+        private static int counter = 0;
         internal static Assembly DefineTypes(Parser parser, Ast rootAst, TypeDefinitionAst[] typeDefinitions)
         {
             Diagnostics.Assert(rootAst.Parent == null, "Caller should only define types from the root ast");
 
             var definedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            // First character is a special mark that allows us to cheaply ignore dynamic generated assemblies in ClrFacade.GetAssemblies()
-            // The replaces at the end are for not-allowed characters. They are replaced by similar-looking chars.
-            string assemblyName = ClrFacade.FIRST_CHAR_PSASSEMBLY_MARK + (string.IsNullOrWhiteSpace(rootAst.Extent.File)
-                                      ? "powershell"
-                                      : rootAst.Extent.File
-                                      .Replace('\\', (char)0x29f9)
-                                      .Replace('/', (char)0x29f9)
-                                      .Replace(',', (char)0x201a)
-                                      .Replace(':', (char)0x0589));
-
-            var assembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(assemblyName),
-                                                                 AssemblyBuilderAccess.RunAndCollect, GetAssemblyAttributeBuilders());
-            var module = assembly.DefineDynamicModule(assemblyName);
+            var assemblyName = new AssemblyName(DynamicClassAssemblyName)
+            {
+                // We could generate a unique name, but a unique version works too.
+                Version = new Version(1, 0, 0, Interlocked.Increment(ref counter))
+            };
+            var assembly = AssemblyBuilder.DefineDynamicAssembly(assemblyName,
+                AssemblyBuilderAccess.RunAndCollect, GetAssemblyAttributeBuilders(rootAst.Extent.File));
+            var module = assembly.DefineDynamicModule(DynamicClassAssemblyName);
 
             var defineTypeHelpers = new List<DefineTypeHelper>();
             var defineEnumHelpers = new List<DefineEnumHelper>();
@@ -1172,7 +1241,7 @@ namespace System.Management.Automation.Language
 
                         SessionStateKeeper sessionStateKeeper = new SessionStateKeeper();
                         helperType.GetField(s_sessionStateKeeperFieldName, BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, sessionStateKeeper);
-                        
+
                         if (helper._fieldsToInitForMemberFunctions != null)
                         {
                             foreach (var tuple in helper._fieldsToInitForMemberFunctions)
@@ -1194,8 +1263,11 @@ namespace System.Management.Automation.Language
                         //
                         // Presumably this catch could go away when we will not create Type at parse time.
                         // Error checking should be moved/added to semantic checks.
-                        parser.ReportError(helper._typeDefinitionAst.Extent, () => ParserStrings.TypeCreationError,
-                            helper._typeBuilder.Name, e.Message);
+                        parser.ReportError(helper._typeDefinitionAst.Extent,
+                            nameof(ParserStrings.TypeCreationError),
+                            ParserStrings.TypeCreationError,
+                            helper._typeBuilder.Name,
+                            e.Message);
                     }
                 }
 

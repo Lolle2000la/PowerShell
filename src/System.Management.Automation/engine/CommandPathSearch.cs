@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections;
 using System.Collections.Generic;
@@ -65,7 +64,7 @@ namespace System.Management.Automation
                     // Porting note: on non-Windows platforms, we want to always allow just 'commandName'
                     // as an acceptable command name. However, we also want to allow commands to be
                     // called with the .ps1 extension, so that 'script.ps1' can be called by 'script'.
-                    commandPatterns = new[] { commandName + ".ps1", commandName };
+                    commandPatterns = new[] { commandName, commandName + ".ps1" };
                 }
                 _postProcessEnumeratedFiles = CheckAgainstAcceptableCommandNames;
                 _acceptableCommandNames = acceptableCommandNames;
@@ -151,7 +150,6 @@ namespace System.Management.Automation
                             "The relative path '{0}', could not resolve a home directory for the provider",
                             _lookupPaths[index]);
                     }
-
 
                     // Note, if the directory resolves to multiple paths, only the first is used.
 

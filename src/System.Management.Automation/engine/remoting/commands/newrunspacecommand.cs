@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 using System.Collections.Generic;
@@ -14,7 +13,6 @@ using System.Management.Automation.Runspaces.Internal;
 using System.Management.Automation.Remoting.Client;
 using System.Threading;
 using Dbg = System.Management.Automation.Diagnostics;
-
 
 namespace Microsoft.PowerShell.Commands
 {
@@ -1069,19 +1067,28 @@ namespace Microsoft.PowerShell.Commands
         {
             // Resolve all the machine names
             String[] resolvedComputerNames;
+
             ResolveComputerNames(HostName, out resolvedComputerNames);
-            ValidateComputerName(resolvedComputerNames);
 
             var remoteRunspaces = new List<RemoteRunspace>();
+            int index = 0;
             foreach (var computerName in resolvedComputerNames)
             {
+                ParseSshHostName(computerName, out string host, out string userName, out int port);
+
                 var sshConnectionInfo = new SSHConnectionInfo(
-                    this.UserName,
-                    computerName,
+                    userName,
+                    host,
                     this.KeyFilePath,
-                    this.Port);
+                    port);
                 var typeTable = TypeTable.LoadDefaultTypeFiles();
-                remoteRunspaces.Add(RunspaceFactory.CreateRunspace(sshConnectionInfo, this.Host, typeTable) as RemoteRunspace);
+                string rsName = GetRunspaceName(index, out int rsIdUnused);
+                index++;
+                remoteRunspaces.Add(RunspaceFactory.CreateRunspace( connectionInfo : sshConnectionInfo,
+                                                                    host : this.Host,
+                                                                    typeTable : typeTable,
+                                                                    applicationArguments : null,
+                                                                    name : rsName) as RemoteRunspace);
             }
 
             return remoteRunspaces;
@@ -1091,6 +1098,7 @@ namespace Microsoft.PowerShell.Commands
         {
             var sshConnections = ParseSSHConnectionHashTable();
             var remoteRunspaces = new List<RemoteRunspace>();
+            int index = 0;
             foreach (var sshConnection in sshConnections)
             {
                 var sshConnectionInfo = new SSHConnectionInfo(
@@ -1099,7 +1107,13 @@ namespace Microsoft.PowerShell.Commands
                     sshConnection.KeyFilePath,
                     sshConnection.Port);
                 var typeTable = TypeTable.LoadDefaultTypeFiles();
-                remoteRunspaces.Add(RunspaceFactory.CreateRunspace(sshConnectionInfo, this.Host, typeTable) as RemoteRunspace);
+                string rsName = GetRunspaceName(index, out int rsIdUnused);
+                index++;
+                remoteRunspaces.Add(RunspaceFactory.CreateRunspace( connectionInfo : sshConnectionInfo,
+                                                                    host : this.Host,
+                                                                    typeTable : typeTable,
+                                                                    applicationArguments : null,
+                                                                    name : rsName) as RemoteRunspace);
             }
 
             return remoteRunspaces;
@@ -1308,7 +1322,7 @@ namespace Microsoft.PowerShell.Commands
         // callbacks for two reasons:
         //  a) To ensure callbacks are made in list order (first added, first called).
         //  b) To ensure all callbacks are fired by manually invoking callbacks and handling
-        //     any exceptions thrown on this thread. (ThrottleManager will hang if it doesn't
+        //     any exceptions thrown on this thread. (ThrottleManager will not respond if it doesn't
         //     get a start/stop complete callback).
         private List<EventHandler<OperationStateEventArgs>> _internalCallbacks = new List<EventHandler<OperationStateEventArgs>>();
         internal override event EventHandler<OperationStateEventArgs> OperationComplete
@@ -1401,7 +1415,7 @@ namespace Microsoft.PowerShell.Commands
             }
             foreach (var callbackDelegate in copyCallbacks)
             {
-                // Ensure all callbacks get called to prevent ThrottleManager hang.
+                // Ensure all callbacks get called to prevent ThrottleManager from not responding.
                 try
                 {
                     callbackDelegate.SafeInvoke(this, operationStateEventArgs);

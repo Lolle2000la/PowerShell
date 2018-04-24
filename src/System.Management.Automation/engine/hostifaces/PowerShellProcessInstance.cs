@@ -1,6 +1,5 @@
-﻿/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.ComponentModel;
 using System.Globalization;
@@ -8,7 +7,6 @@ using System.IO;
 using System.Management.Automation.Remoting;
 using System.Text;
 using System.Diagnostics;
-
 
 namespace System.Management.Automation.Runspaces
 {
@@ -38,10 +36,10 @@ namespace System.Management.Automation.Runspaces
         {
 #if UNIX
             s_PSExePath = Path.Combine(Utils.DefaultPowerShellAppBase,
-                            "powershell");
+                            "pwsh");
 #else
             s_PSExePath = Path.Combine(Utils.DefaultPowerShellAppBase,
-                            "powershell.exe");
+                            "pwsh.exe");
 #endif
         }
 
@@ -79,7 +77,7 @@ namespace System.Management.Automation.Runspaces
 #if CORECLR
             string processArguments = " -s -NoLogo -NoProfile";
 #else
-            // Adding Version parameter to powershell.exe
+            // Adding Version parameter to powershell
             // Version parameter needs to go before all other parameters because the native layer looks for Version or
             // PSConsoleFile parameters before parsing other parameters.
             // The other parameters get parsed in the managed layer.

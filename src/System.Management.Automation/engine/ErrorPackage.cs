@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 #pragma warning disable 1634, 1691
 #pragma warning disable 56506
@@ -901,7 +900,7 @@ namespace System.Management.Automation
             string resourceId,
             params object[] args)
         {
-            if (String.IsNullOrEmpty(template) || 1 >= template.Trim().Length)
+            if (string.IsNullOrWhiteSpace(template))
             {
                 _textLookupError = PSTraceSource.NewInvalidOperationException(
                     ErrorPackage.ErrorDetailsEmptyTemplate,
@@ -926,7 +925,6 @@ namespace System.Management.Automation
         #endregion Private
 
     } // class ErrorDetails
-
 
     /// <summary>
     /// Represents an error.
@@ -1057,8 +1055,6 @@ namespace System.Management.Automation
             }
         }
         #endregion Serialization
-
-
 
         #region Remoting
 

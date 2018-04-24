@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 using System.Collections;
@@ -60,7 +59,6 @@ namespace Microsoft.PowerShell.Commands
         // to copy an item onto itself.
         private const string SelfCopyDataKey = "SelfCopy";
 
-
         /// <summary>
         /// An instance of the PSTraceSource class used for trace output
         /// using "FileSystemProvider" as the category.
@@ -100,7 +98,6 @@ namespace Microsoft.PowerShell.Commands
         {
             return path.Replace(StringLiterals.AlternatePathSeparator, StringLiterals.DefaultPathSeparator);
         } // NormalizePath
-
 
         /// <summary>
         ///  Checks if the item exist at the specified path. if it exists then creates
@@ -330,7 +327,6 @@ namespace Microsoft.PowerShell.Commands
         #endregion
 
         #region CmdletProvider members
-
 
         /// <summary>
         /// Starts the File System provider.  This method sets the Home for the
@@ -630,7 +626,6 @@ namespace Microsoft.PowerShell.Commands
                     // if a drive is not persisted or networkdrive, we need to use the actual root to remove the drive.
                     driveName = drive.Root;
                 }
-
 
                 // You need to actually remove the drive.
                 int code = NativeMethods.WNetCancelConnection2(driveName, flags, true);
@@ -1005,7 +1000,6 @@ namespace Microsoft.PowerShell.Commands
             return results;
         } // InitializeDefaultDrives
 
-
         #endregion DriveCmdletProvider methods
 
         #region ItemCmdletProvider methods
@@ -1040,7 +1034,6 @@ namespace Microsoft.PowerShell.Commands
             {
                 return false;
             }
-
 
             //Normalize the path
             path = NormalizePath(path);
@@ -1407,7 +1400,6 @@ namespace Microsoft.PowerShell.Commands
         } // GetChildItems
         #endregion GetChildItems
 
-
         #region GetChildNames
         /// <summary>
         /// Gets the path names for all children of the specified
@@ -1751,7 +1743,6 @@ namespace Microsoft.PowerShell.Commands
                         }
                     }// foreach
                 }// foreach
-
 
                 bool isFilterHiddenSpecified = false;           // "Hidden" is specified somewhere in the expression
                 bool isSwitchFilterHiddenSpecified = false;     // "Hidden" is specified somewhere in the parameters
@@ -2129,7 +2120,6 @@ namespace Microsoft.PowerShell.Commands
 
                         fileMode = FileMode.Create;
                     }
-
 
                     string action = FileSystemProviderStrings.NewItemActionFile;
 
@@ -2537,7 +2527,6 @@ namespace Microsoft.PowerShell.Commands
             HardLink
         };
 
-
         private static ItemType GetItemType(string input)
         {
             ItemType itemType = ItemType.Unknown;
@@ -2732,7 +2721,6 @@ namespace Microsoft.PowerShell.Commands
 
             return result;
         } // CreateIntermediateDirectories
-
 
         #endregion NewItem
 
@@ -3353,7 +3341,6 @@ namespace Microsoft.PowerShell.Commands
                 return new FileSystemItemProviderDynamicParameters();
             }
         } // ItemExistsDynamicParameters
-
 
         #endregion ItemExists
 
@@ -4849,7 +4836,6 @@ namespace Microsoft.PowerShell.Commands
             return result;
         }
 
-
         private static bool IsUNCPath(string path)
         {
             return path.StartsWith("\\\\", StringComparison.Ordinal);
@@ -4966,7 +4952,6 @@ namespace Microsoft.PowerShell.Commands
                 throw PSTraceSource.NewArgumentException("path");
             }
 
-
             if (basePath == null)
             {
                 basePath = String.Empty;
@@ -4996,13 +4981,13 @@ namespace Microsoft.PowerShell.Commands
                 try
                 {
                     string originalPathComparison = path;
-                    if (!originalPathComparison.EndsWith("" + StringLiterals.DefaultPathSeparator, StringComparison.OrdinalIgnoreCase))
+                    if (!originalPathComparison.EndsWith(StringLiterals.DefaultPathSeparatorString, StringComparison.OrdinalIgnoreCase))
                     {
                         originalPathComparison += StringLiterals.DefaultPathSeparator;
                     }
 
                     string basePathComparison = basePath;
-                    if (!basePathComparison.EndsWith("" + StringLiterals.DefaultPathSeparator, StringComparison.OrdinalIgnoreCase))
+                    if (!basePathComparison.EndsWith(StringLiterals.DefaultPathSeparatorString, StringComparison.OrdinalIgnoreCase))
                     {
                         basePathComparison += StringLiterals.DefaultPathSeparator;
                     }
@@ -5205,7 +5190,7 @@ namespace Microsoft.PowerShell.Commands
                 // See if the base and the path are already the same. We resolve this to
                 // ..\Leaf, since resolving "." to "." doesn't offer much information.
                 if (String.Equals(path, basePath, StringComparison.OrdinalIgnoreCase) &&
-                    (!originalPath.EndsWith("" + StringLiterals.DefaultPathSeparator, StringComparison.OrdinalIgnoreCase)))
+                    (!originalPath.EndsWith(StringLiterals.DefaultPathSeparatorString, StringComparison.OrdinalIgnoreCase)))
                 {
                     string childName = GetChildName(path);
                     result = MakePath("..", childName);
@@ -5252,7 +5237,7 @@ namespace Microsoft.PowerShell.Commands
                     if (!String.IsNullOrEmpty(commonBase))
                     {
                         if (String.Equals(path, commonBase, StringComparison.OrdinalIgnoreCase) &&
-                            (!path.EndsWith("" + StringLiterals.DefaultPathSeparator, StringComparison.OrdinalIgnoreCase)))
+                            (!path.EndsWith(StringLiterals.DefaultPathSeparatorString, StringComparison.OrdinalIgnoreCase)))
                         {
                             string childName = GetChildName(path);
                             result = MakePath("..", result);
@@ -5578,7 +5563,6 @@ namespace Microsoft.PowerShell.Commands
             return leafElement;
         } // CreateNormalizedRelativePathFromStack
 
-
         /// <summary>
         /// Gets the name of the leaf element of the specified path.
         /// </summary>
@@ -5743,12 +5727,10 @@ namespace Microsoft.PowerShell.Commands
                         destination = MakePath(destination, dir.Name);
                     }
 
-
                     // Get the confirmation text
                     string action = FileSystemProviderStrings.MoveItemActionDirectory;
 
                     string resource = StringUtil.Format(FileSystemProviderStrings.MoveItemResourceFileTemplate, dir.FullName, destination);
-
 
                     // Confirm the move with the user
                     if (ShouldProcess(resource, action))
@@ -5782,7 +5764,6 @@ namespace Microsoft.PowerShell.Commands
                     string action = FileSystemProviderStrings.MoveItemActionFile;
 
                     string resource = StringUtil.Format(FileSystemProviderStrings.MoveItemResourceFileTemplate, file.FullName, destination);
-
 
                     // Confirm the move with the user
 
@@ -6614,12 +6595,17 @@ namespace Microsoft.PowerShell.Commands
                         delimiter = dynParams.Delimiter;
 
                     // Get the stream type
-                    usingByteEncoding = dynParams.UsingByteEncoding;
+                    usingByteEncoding = dynParams.AsByteStream;
                     streamTypeSpecified = dynParams.WasStreamTypeSpecified;
+
+                    if (usingByteEncoding && streamTypeSpecified)
+                    {
+                        WriteWarning(FileSystemProviderStrings.EncodingNotUsed);
+                    }
 
                     if (streamTypeSpecified)
                     {
-                        encoding = dynParams.EncodingType;
+                        encoding = dynParams.Encoding;
                     }
 
                     // Get the wait value
@@ -6765,12 +6751,17 @@ namespace Microsoft.PowerShell.Commands
 
                 if (dynParams != null)
                 {
-                    usingByteEncoding = dynParams.UsingByteEncoding;
+                    usingByteEncoding = dynParams.AsByteStream;
                     streamTypeSpecified = dynParams.WasStreamTypeSpecified;
+
+                    if (usingByteEncoding && streamTypeSpecified)
+                    {
+                        WriteWarning(FileSystemProviderStrings.EncodingNotUsed);
+                    }
 
                     if (streamTypeSpecified)
                     {
-                        encoding = dynParams.EncodingType;
+                        encoding = dynParams.Encoding;
                     }
 
 #if !UNIX
@@ -7477,73 +7468,6 @@ namespace Microsoft.PowerShell.Commands
         }
     }
 
-    /// <summary>
-    /// Defines the values that can be supplied as the encoding parameter in the
-    /// FileSystemContentDynamicParametersBase class.
-    /// </summary>
-    public enum FileSystemCmdletProviderEncoding
-    {
-        /// <summary>
-        /// No encoding.
-        /// </summary>
-        Unknown,
-
-        /// <summary>
-        /// Unicode encoding.
-        /// </summary>
-        String,
-
-        /// <summary>
-        /// Unicode encoding.
-        /// </summary>
-        Unicode,
-
-        /// <summary>
-        /// Byte encoding.
-        /// </summary>
-        Byte,
-
-        /// <summary>
-        /// Big Endian Unicode encoding.
-        /// </summary>
-        BigEndianUnicode,
-
-        /// <summary>
-        /// UTF8 encoding.
-        /// </summary>
-        UTF8,
-
-        /// <summary>
-        /// UTF7 encoding.
-        /// </summary>
-        UTF7,
-
-        /// <summary>
-        /// UTF32 encoding.
-        /// </summary>
-        UTF32,
-
-        /// <summary>
-        /// ASCII encoding.
-        /// </summary>
-        Ascii,
-
-        /// <summary>
-        /// Default encoding.
-        /// </summary>
-        Default,
-
-        /// <summary>
-        /// OEM encoding.
-        /// </summary>
-        Oem,
-
-        /// <summary>
-        /// Big Endian UTF32 encoding.
-        /// </summary>
-        BigEndianUTF32,
-    } // FileSystemCmdletProviderEncoding
-
     #endregion
 
     #region Dynamic Parameters
@@ -7647,7 +7571,39 @@ namespace Microsoft.PowerShell.Commands
         /// reading data from the file.
         /// </summary>
         [Parameter]
-        public FileSystemCmdletProviderEncoding Encoding { get; set; } = FileSystemCmdletProviderEncoding.String;
+        [ArgumentToEncodingTransformationAttribute()]
+        [ArgumentCompletions(
+            EncodingConversion.Ascii,
+            EncodingConversion.BigEndianUnicode,
+            EncodingConversion.OEM,
+            EncodingConversion.Unicode,
+            EncodingConversion.Utf7,
+            EncodingConversion.Utf8,
+            EncodingConversion.Utf8Bom,
+            EncodingConversion.Utf8NoBom,
+            EncodingConversion.Utf32
+            )]
+        [ValidateNotNullOrEmpty]
+        public Encoding Encoding
+        {
+            get
+            {
+                return _encoding;
+            }
+            set
+            {
+                _encoding = value;
+                // If an encoding was explicitly set, be sure to capture that.
+                WasStreamTypeSpecified = true;
+            }
+        }
+        private Encoding _encoding = ClrFacade.GetDefaultEncoding();
+
+        /// <summary>
+        /// Return file contents as a byte stream or create file from a series of bytes
+        /// </summary>
+        [Parameter]
+        public SwitchParameter AsByteStream { get; set; }
 
 #if !UNIX
         /// <summary>
@@ -7658,39 +7614,10 @@ namespace Microsoft.PowerShell.Commands
 #endif
 
         /// <summary>
-        /// Gets the encoding from the specified StreamType parameter.
-        /// </summary>
-        public Encoding EncodingType
-        {
-            get
-            {
-                return Utils.GetEncodingFromEnum(Encoding);
-            }
-        } // EncodingType
-
-        /// <summary>
-        /// Gets the Byte Encoding status of the StreamType parameter.  Returns true
-        /// if the stream was opened with "Byte" encoding, false otherwise.
-        /// </summary>
-        public bool UsingByteEncoding
-        {
-            get
-            {
-                return Encoding == FileSystemCmdletProviderEncoding.Byte;
-            } // get
-        } // UsingByteEncoding
-
-        /// <summary>
         /// Gets the status of the StreamType parameter.  Returns true
         /// if the stream was opened with a user-specified encoding, false otherwise.
         /// </summary>
-        public bool WasStreamTypeSpecified
-        {
-            get
-            {
-                return (Encoding != FileSystemCmdletProviderEncoding.String);
-            } // get
-        } // WasStreamTypeSpecified
+        public bool WasStreamTypeSpecified { get; private set; }
 
     } // class FileSystemContentDynamicParametersBase
 
@@ -7748,13 +7675,13 @@ namespace Microsoft.PowerShell.Commands
             get
             {
                 return _delimiter;
-            } // get
+            }
 
             set
             {
                 DelimiterSpecified = true;
                 _delimiter = value;
-            } // set
+            }
         }
         private string _delimiter = "\n";
 
@@ -7804,7 +7731,6 @@ namespace Microsoft.PowerShell.Commands
 // get
         } // DelimiterSpecified
     } // class FileSystemContentReaderDynamicParameters
-
 
     /// <summary>
     /// Provides the dynamic parameters for test-path on the file system.
@@ -9806,7 +9732,6 @@ namespace System.Management.Automation.Internal
 
             return $op
         }}
-
 
         #
         # Call helper function based on bound parameter set

@@ -1,4 +1,7 @@
-﻿#region privateFunctions
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
+#region privateFunctions
 
 $script:psRepoPath = [string]::Empty
 if ($null -ne (Get-Command -Name 'git' -ErrorAction Ignore)) {
@@ -426,7 +429,6 @@ function Get-CodeCoverage
     (Get-CoverageData -xmlPath $xmlPath)
 }
 
-
 <#
 .Synopsis
    Compare results between two coverage runs.
@@ -611,7 +613,7 @@ function Install-OpenCover
 .Synopsis
    Invoke-OpenCover runs tests under OpenCover to collect code coverage.
 .Description
-   Invoke-OpenCover runs tests under OpenCover by executing tests on PowerShell.exe located at $PowerShellExeDirectory.
+   Invoke-OpenCover runs tests under OpenCover by executing tests on PowerShell located at $PowerShellExeDirectory.
 .EXAMPLE
    Invoke-OpenCover -TestPath $pwd/test/powershell -PowerShellExeDirectory $pwd/src/powershell-win-core/bin/CodeCoverage/netcoreapp1.0/win7-x64
 #>
@@ -654,8 +656,8 @@ function Invoke-OpenCover
         }
     }
 
-    # check to be sure that powershell.exe is present
-    $target = "${PowerShellExeDirectory}\powershell.exe"
+    # check to be sure that pwsh.exe is present
+    $target = "${PowerShellExeDirectory}\pwsh.exe"
     if ( ! (test-path $target) )
     {
         throw "$target does not exist, use 'Start-PSBuild -configuration CodeCoverage'"
@@ -667,7 +669,7 @@ function Invoke-OpenCover
     $testToolsExePath = (Resolve-Path(Join-Path $TestPath -ChildPath "..\tools\TestExe\bin")).Path
     $updatedProcessEnvPath = "${testToolsExePath};${env:PATH}"
 
-    $startupArgs =  "Set-ExecutionPolicy Bypass -Force -Scope Process; `$env:PSModulePath = '${updatedEnvPath}'; `$env:Path = '${updatedProcessEnvPath}'"
+    $startupArgs =  "Set-ExecutionPolicy Bypass -Force -Scope Process; `$env:PSModulePath = '${updatedEnvPath}'; `$env:Path = '${updatedProcessEnvPath}';"
     $targetArgs = "${startupArgs}", "Invoke-Pester","${TestPath}","-OutputFormat $PesterLogFormat"
 
     if ( $CIOnly )

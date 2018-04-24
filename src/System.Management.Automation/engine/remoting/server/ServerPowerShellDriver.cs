@@ -1,6 +1,5 @@
-/********************************************************************++
- * Copyright (c) Microsoft Corporation.  All rights reserved.
- * --********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Security.Principal;
 using System.Management.Automation.Runspaces;
@@ -8,7 +7,6 @@ using Dbg = System.Management.Automation.Diagnostics;
 using System.Management.Automation.Remoting;
 using System.Management.Automation.Internal;
 using System.Threading;
-
 
 namespace System.Management.Automation
 {
@@ -389,7 +387,7 @@ namespace System.Management.Automation
             {
                 // Since this is being invoked asynchronously on a single pipeline thread
                 // any invoke failures (such as possible debugger failures) need to be
-                // passed back to client or the original client invoke request will hang.
+                // passed back to client or the original client invoke request will not respond.
                 string failedCommand = LocalPowerShell.Commands.Commands[0].CommandText;
                 LocalPowerShell.Commands.Clear();
                 string msg = StringUtil.Format(

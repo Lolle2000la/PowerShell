@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections.Generic;
 
@@ -214,10 +213,8 @@ namespace System.Management.Automation
         internal const string PSSessionApplicationName = "PSSessionApplicationName";
         internal static readonly VariablePath PSSessionApplicationNameVarPath = new VariablePath("global:" + PSSessionApplicationName);
 
-
         #region AllScope variables created in every session
 
-        internal const string ConsoleFileName = "ConsoleFileName";
         internal const string ExecutionContext = "ExecutionContext";
         internal const string Home = "HOME";
         internal const string Host = "Host";
@@ -229,10 +226,8 @@ namespace System.Management.Automation
         internal const string PSEdition = "PSEdition";
         internal const string ShellId = "ShellId";
 
-
         internal static List<string> AllScopeSessionVariables = new List<string>
         {
-            ConsoleFileName,
             ExecutionContext,
             Home,
             Host,
@@ -297,7 +292,6 @@ namespace System.Management.Automation
         // also exists.
         internal static readonly string[] AllScopeVariables = {
                                                                   SpecialVariables.Question,
-                                                                  SpecialVariables.ConsoleFileName,
                                                                   SpecialVariables.ExecutionContext,
                                                                   SpecialVariables.False,
                                                                   SpecialVariables.Home,

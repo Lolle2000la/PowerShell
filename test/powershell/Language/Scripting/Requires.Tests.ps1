@@ -1,3 +1,5 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
 Describe "Requires tests" -Tags "CI" {
     Context "Parser error" {
 
@@ -20,7 +22,7 @@ Describe "Requires tests" -Tags "CI" {
             }
             catch
             {
-                $_.FullyQualifiedErrorId | Should Be "ParseException"
+                $_.FullyQualifiedErrorId | Should -BeExactly "ParseException"
             }
         }
     }

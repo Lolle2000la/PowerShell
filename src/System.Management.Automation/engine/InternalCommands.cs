@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 using System.Linq.Expressions;
@@ -29,7 +28,7 @@ namespace Microsoft.PowerShell.Commands
     public sealed class ForEachObjectCommand : PSCmdlet
     {
         /// <summary>
-        /// This parameter specifies the current pipeline object 
+        /// This parameter specifies the current pipeline object
         /// </summary>
         [Parameter(ValueFromPipeline = true, ParameterSetName = "ScriptBlockSet")]
         [Parameter(ValueFromPipeline = true, ParameterSetName = "PropertyAndMethodSet")]
@@ -123,7 +122,6 @@ namespace Microsoft.PowerShell.Commands
 
         #endregion ScriptBlockSet
 
-
         #region PropertyAndMethodSet
 
         /// <summary>
@@ -153,7 +151,6 @@ namespace Microsoft.PowerShell.Commands
         private object[] _arguments;
 
         #endregion PropertyAndMethodSet
-
 
         /// <summary>
         /// Execute the begin scriptblock at the start of processing
@@ -295,12 +292,12 @@ namespace Microsoft.PowerShell.Commands
                                 else
                                 {
                                     // we write null out because:
-                                    // PS C:\> “$null | ForEach-object {$_.aa} | ForEach-Object {$_ + 3}”
+                                    // PS C:\> $null | ForEach-object {$_.aa} | ForEach-Object {$_ + 3}
                                     // 3
                                     // so we also want
-                                    // PS C:\> “$null | ForEach-object aa | ForEach-Object {$_ + 3}”
+                                    // PS C:\> $null | ForEach-object aa | ForEach-Object {$_ + 3}
                                     // 3
-                                    // But if we don’t write anything to the pipeline when _inputObject is null,
+                                    // But if we don't write anything to the pipeline when _inputObject is null,
                                     // the result 3 will not be generated.
                                     WriteObject(null);
                                 }
@@ -473,7 +470,7 @@ namespace Microsoft.PowerShell.Commands
                                 // so we also want
                                 // PS C:\> "string" | ForEach-Object aa | ForEach-Object {$_ + 3}
                                 // 3
-                                // But if we don’t write anything to the pipeline when no member is found,
+                                // But if we don't write anything to the pipeline when no member is found,
                                 // the result 3 will not be generated.
                                 WriteObject(null);
                             }
@@ -579,7 +576,7 @@ namespace Microsoft.PowerShell.Commands
         }
 
         /// <summary>
-        /// Get the value by taking _propertyOrMethodName as the key, if the 
+        /// Get the value by taking _propertyOrMethodName as the key, if the
         /// input object is a IDictionary.
         /// </summary>
         /// <returns></returns>
@@ -611,7 +608,7 @@ namespace Microsoft.PowerShell.Commands
         }
 
         /// <summary>
-        /// Unroll the object to be output. If it's of type IEnumerator, unroll and output it 
+        /// Unroll the object to be output. If it's of type IEnumerator, unroll and output it
         /// by calling WriteOutIEnumerator. If it's not, unroll and output it by calling WriteObject(obj, true)
         /// </summary>
         /// <param name="obj"></param>
@@ -649,7 +646,7 @@ namespace Microsoft.PowerShell.Commands
         }
 
         /// <summary>
-        /// Check if the language mode is the restrictedLanguageMode before invoking a method. 
+        /// Check if the language mode is the restrictedLanguageMode before invoking a method.
         /// Write out error message and return true if we are in restrictedLanguageMode.
         /// </summary>
         /// <returns></returns>
@@ -719,7 +716,6 @@ namespace Microsoft.PowerShell.Commands
             return errorRecord;
         }
 
-
         /// <summary>
         /// Execute the end scriptblock when the pipeline is complete
         /// </summary>
@@ -756,7 +752,7 @@ namespace Microsoft.PowerShell.Commands
     public sealed class WhereObjectCommand : PSCmdlet
     {
         /// <summary>
-        /// This parameter specifies the current pipeline object 
+        /// This parameter specifies the current pipeline object
         /// </summary>
         [Parameter(ValueFromPipeline = true)]
         public PSObject InputObject
@@ -782,7 +778,6 @@ namespace Microsoft.PowerShell.Commands
                 return _script;
             }
         }
-
 
         private string _property;
         /// <summary>
@@ -818,13 +813,13 @@ namespace Microsoft.PowerShell.Commands
         [Parameter(Mandatory = true, Position = 0, ParameterSetName = "CaseSensitiveNotInSet")]
         [Parameter(Mandatory = true, Position = 0, ParameterSetName = "IsSet")]
         [Parameter(Mandatory = true, Position = 0, ParameterSetName = "IsNotSet")]
+        [Parameter(Mandatory = true, Position = 0, ParameterSetName = "Not")]
         [ValidateNotNullOrEmpty]
         public string Property
         {
             set { _property = value; }
             get { return _property; }
         }
-
 
         private object _convertedValue;
         private object _value = true;
@@ -1205,6 +1200,16 @@ namespace Microsoft.PowerShell.Commands
             get { return _binaryOperator == TokenKind.IsNot; }
         }
 
+        /// <summary>
+        /// Binary operator -Not.
+        /// </summary>
+        [Parameter(Mandatory = true, ParameterSetName = "Not")]
+        public SwitchParameter Not
+        {
+            set { _binaryOperator = TokenKind.Not; }
+            get { return _binaryOperator == TokenKind.Not; }
+        }
+
         #endregion binary operator parameters
 
         private readonly CallSite<Func<CallSite, object, bool>> _toBoolSite =
@@ -1215,6 +1220,16 @@ namespace Microsoft.PowerShell.Commands
         {
             var site = CallSite<Func<CallSite, object, object, object>>.Create(PSBinaryOperationBinder.Get(expressionType, ignoreCase));
             return (x, y) => site.Target.Invoke(site, x, y);
+        }
+
+        private static Func<object, object, object> GetCallSiteDelegateBoolean(ExpressionType expressionType, bool ignoreCase)
+        {
+            // flip 'lval' and 'rval' in the scenario '... | Where-Object property' so as to make it
+            // equivalent to '... | Where-Object {$true -eq property}'. Because we want the property to
+            // be compared under the bool context. So that '"string" | Where-Object Length' would behave
+            // just like '"string" | Where-Object {$_.Length}'.
+            var site = CallSite<Func<CallSite, object, object, object>>.Create(binder: PSBinaryOperationBinder.Get(expressionType, ignoreCase));
+            return (x, y) => site.Target.Invoke(site, y, x);
         }
 
         private static Tuple<CallSite<Func<CallSite, object, IEnumerator>>, CallSite<Func<CallSite, object, object, object>>> GetContainsCallSites(bool ignoreCase)
@@ -1267,12 +1282,7 @@ namespace Microsoft.PowerShell.Commands
                     }
                     else
                     {
-                        // flip 'lval' and 'rval' in the scenario '... | Where-Object property' so as to make it
-                        // equivalent to '... | Where-Object {$true -eq property}'. Because we want the property to
-                        // be compared under the bool context. So that '"string" | Where-Object Length' would behave
-                        // just like '"string" | Where-Object {$_.Length}'.
-                        var site = CallSite<Func<CallSite, object, object, object>>.Create(PSBinaryOperationBinder.Get(ExpressionType.Equal, true));
-                        _operationDelegate = (x, y) => site.Target.Invoke(site, y, x);
+                        _operationDelegate = GetCallSiteDelegateBoolean(ExpressionType.Equal, ignoreCase: true);
                     }
                     break;
                 case TokenKind.Ceq:
@@ -1343,6 +1353,9 @@ namespace Microsoft.PowerShell.Commands
                     CheckLanguageMode();
                     _operationDelegate =
                         (lval, rval) => ParserOps.MatchOperator(Context, PositionUtilities.EmptyExtent, lval, rval, notMatch: true, ignoreCase: false);
+                    break;
+                case TokenKind.Not:
+                    _operationDelegate = GetCallSiteDelegateBoolean(ExpressionType.NotEqual, ignoreCase: true);
                     break;
                 // the second to last parameter in ContainsOperator has flipped semantics compared to others.
                 // "true" means "contains" while "false" means "notcontains"
@@ -1469,7 +1482,7 @@ namespace Microsoft.PowerShell.Commands
             else
             {
                 // Both -Property and -Value need to be specified if the user specifies the binary operation
-                if (_valueNotSpecified && (_binaryOperator != TokenKind.Ieq || !_forceBooleanEvaluation))
+                if (_valueNotSpecified && ((_binaryOperator != TokenKind.Ieq && _binaryOperator != TokenKind.Not) || !_forceBooleanEvaluation))
                 {
                     // The binary operation is specified explicitly by the user and the -Value parameter is
                     // not specified
@@ -1640,8 +1653,6 @@ namespace Microsoft.PowerShell.Commands
         }
     }
 
-
-
     /// <summary>
     /// Implements a cmdlet that sets the script debugging options.
     /// </summary>
@@ -1733,7 +1744,7 @@ namespace Microsoft.PowerShell.Commands
     ///
     /// Note:
     ///
-    /// Unlike Set-PSDebug -strict, Set-StrictMode is not engine-wide, and only 
+    /// Unlike Set-PSDebug -strict, Set-StrictMode is not engine-wide, and only
     /// affects the scope it was defined in.
     /// </summary>
     [Cmdlet(VerbsCommon.Set, "StrictMode", DefaultParameterSetName = "Version", HelpUri = "https://go.microsoft.com/fwlink/?LinkID=113450")]
@@ -1835,7 +1846,6 @@ namespace Microsoft.PowerShell.Commands
         }
     }
     #endregion Set-StrictMode
-
 
     #endregion Built-in cmdlets that are used by or require direct access to the engine.
 }

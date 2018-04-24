@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections;
 using System.Collections.Generic;
@@ -162,7 +161,7 @@ namespace System.Management.Automation
 
                 if (cpi.ArgumentSplatted)
                 {
-                    foreach (var splattedCpi in Splat(cpi.ArgumentValue, cpi.ArgumentExtent))
+                    foreach (var splattedCpi in Splat(cpi.ArgumentValue, cpi.ArgumentAst))
                     {
                         commandProcessor.AddParameter(splattedCpi);
                     }
@@ -293,7 +292,7 @@ namespace System.Management.Automation
             return commandProcessor;
         }
 
-        internal static IEnumerable<CommandParameterInternal> Splat(object splattedValue, IScriptExtent splatExtent)
+        internal static IEnumerable<CommandParameterInternal> Splat(object splattedValue, Ast splatAst)
         {
             splattedValue = PSObject.Base(splattedValue);
             IDictionary splattedTable = splattedValue as IDictionary;
@@ -306,8 +305,8 @@ namespace System.Management.Automation
                     string parameterText = GetParameterText(parameterName);
 
                     yield return CommandParameterInternal.CreateParameterWithArgument(
-                        splatExtent, parameterName, parameterText,
-                        splatExtent, parameterValue, false);
+                        splatAst, parameterName, parameterText,
+                        splatAst, parameterValue, false);
                 }
             }
             else
@@ -317,17 +316,17 @@ namespace System.Management.Automation
                 {
                     foreach (object obj in enumerableValue)
                     {
-                        yield return SplatEnumerableElement(obj, splatExtent);
+                        yield return SplatEnumerableElement(obj, splatAst);
                     }
                 }
                 else
                 {
-                    yield return SplatEnumerableElement(splattedValue, splatExtent);
+                    yield return SplatEnumerableElement(splattedValue, splatAst);
                 }
             }
         }
 
-        private static CommandParameterInternal SplatEnumerableElement(object splattedArgument, IScriptExtent splatExtent)
+        private static CommandParameterInternal SplatEnumerableElement(object splattedArgument, Ast splatAst)
         {
             var psObject = splattedArgument as PSObject;
             if (psObject != null)
@@ -336,11 +335,11 @@ namespace System.Management.Automation
                 var baseObj = psObject.BaseObject;
                 if (prop != null && prop.Value is string && baseObj is string)
                 {
-                    return CommandParameterInternal.CreateParameter(splatExtent, (string)prop.Value, (string)baseObj);
+                    return CommandParameterInternal.CreateParameter((string)prop.Value, (string)baseObj, splatAst);
                 }
             }
 
-            return CommandParameterInternal.CreateArgument(splatExtent, splattedArgument);
+            return CommandParameterInternal.CreateArgument(splattedArgument, splatAst);
         }
 
         private static string GetParameterText(string parameterName)
@@ -410,7 +409,7 @@ namespace System.Management.Automation
                     commandProcessor = AddCommand(pipelineProcessor, pipeElements[i], pipeElementAsts[i],
                                                   commandRedirection, context);
                 }
-    
+
                 var cmdletInfo = commandProcessor?.CommandInfo as CmdletInfo;
                 if (cmdletInfo?.ImplementingType == typeof(OutNullCommand))
                 {
@@ -420,7 +419,7 @@ namespace System.Management.Automation
                         // Out-Null is the only command, bail without running anything
                         return;
                     }
-    
+
                     // Out-Null is the last command, rewrite command before Out-Null to a null pipe, but
                     // only if it didn't redirect anything, e.g. `Get-Stuff > o.txt | Out-Null`
                     var nextToLastCommand = pipelineProcessor.Commands[commandsCount - 2];
@@ -493,7 +492,7 @@ namespace System.Management.Automation
                 System.Text.StringBuilder updatedScriptblock = new System.Text.StringBuilder(cmdPrefix.Length + scriptblockBodyString.Length + 18);
                 updatedScriptblock.Append(cmdPrefix);
                 int position = 0;
-                // Prefix variables in the scriptblock with $using: 
+                // Prefix variables in the scriptblock with $using:
                 foreach (var v in variables)
                 {
                     var vName = ((VariableExpressionAst) v).VariablePath.UserPath;
@@ -502,7 +501,7 @@ namespace System.Management.Automation
                         continue;
                     // Skip PowerShell magic variables
                     if (Regex.Match(vName,
-                            "^(global:){0,1}(PID|PSVersionTable|PSEdition|PSHOME|HOST|TRUE|FALSE|NULL)$", 
+                            "^(global:){0,1}(PID|PSVersionTable|PSEdition|PSHOME|HOST|TRUE|FALSE|NULL)$",
                                 RegexOptions.IgnoreCase|RegexOptions.CultureInvariant).Success == false
                     )
                     {
@@ -519,8 +518,8 @@ namespace System.Management.Automation
                 commandProcessor = context.CommandDiscovery.LookupCommandProcessor(
                     commandInfo, CommandOrigin.Internal, false, context.EngineSessionState);
                 var parameter = CommandParameterInternal.CreateParameterWithArgument(
-                    pipelineAst.Extent, "ScriptBlock", null,
-                    pipelineAst.Extent, sb,
+                    /*parameterAst*/pipelineAst, "ScriptBlock", null,
+                    /*argumentAst*/pipelineAst, sb,
                     false);
                 commandProcessor.AddParameter(parameter);
                 pipelineProcessor.Add(commandProcessor);
@@ -646,7 +645,7 @@ namespace System.Management.Automation
                         var exprAst = (ExpressionAst)commandElement;
                         var argument = Compiler.GetExpressionValue(exprAst, isTrusted, context);
                         var splatting = (exprAst is VariableExpressionAst && ((VariableExpressionAst)exprAst).Splatted);
-                        commandParameters.Add(CommandParameterInternal.CreateArgument(exprAst.Extent, argument, splatting));
+                        commandParameters.Add(CommandParameterInternal.CreateArgument(argument, exprAst, splatting));
                     }
 
                     var redirections = new List<CommandRedirection>();
@@ -709,14 +708,14 @@ namespace System.Management.Automation
 
             if (argumentAst == null)
             {
-                return CommandParameterInternal.CreateParameter(errorPos, commandParameterAst.ParameterName, errorPos.Text);
+                return CommandParameterInternal.CreateParameter(commandParameterAst.ParameterName, errorPos.Text, commandParameterAst);
             }
 
             object argumentValue = Compiler.GetExpressionValue(argumentAst, isTrusted, context);
             bool spaceAfterParameter = (errorPos.EndLineNumber != argumentAst.Extent.StartLineNumber ||
                                         errorPos.EndColumnNumber != argumentAst.Extent.StartColumnNumber);
-            return CommandParameterInternal.CreateParameterWithArgument(errorPos, commandParameterAst.ParameterName,
-                                                                        errorPos.Text, argumentAst.Extent, argumentValue,
+            return CommandParameterInternal.CreateParameterWithArgument(commandParameterAst, commandParameterAst.ParameterName,
+                                                                        errorPos.Text, argumentAst, argumentValue,
                                                                         spaceAfterParameter);
         }
 
@@ -1115,16 +1114,16 @@ namespace System.Management.Automation
             // Unicode is still the default, but now may be overridden
 
             var cpi = CommandParameterInternal.CreateParameterWithArgument(
-                PositionUtilities.EmptyExtent, "Filepath", "-Filepath:",
-                PositionUtilities.EmptyExtent, File,
+                /*parameterAst*/null, "Filepath", "-Filepath:",
+                /*argumentAst*/null, File,
                 false);
             commandProcessor.AddParameter(cpi);
 
             if (this.Appending)
             {
                 cpi = CommandParameterInternal.CreateParameterWithArgument(
-                    PositionUtilities.EmptyExtent, "Append", "-Append:",
-                    PositionUtilities.EmptyExtent, true,
+                    /*parameterAst*/null, "Append", "-Append:",
+                    /*argumentAst*/null, true,
                     false);
                 commandProcessor.AddParameter(cpi);
             }
@@ -2023,7 +2022,7 @@ namespace System.Management.Automation
 
                     try
                     {
-                        if (generic != null && generic.GetTypeInfo().ContainsGenericParameters)
+                        if (generic != null && generic.ContainsGenericParameters)
                             generic.MakeGenericType(typeArgs);
                     }
                     catch (Exception e)
@@ -2189,7 +2188,7 @@ namespace System.Management.Automation
                 if (t.IsClass)
                 {
                     var helperType =
-                        t.Type.GetTypeInfo().Assembly.GetType(t.Type.FullName + "_<staticHelpers>");
+                        t.Type.Assembly.GetType(t.Type.FullName + "_<staticHelpers>");
                     Diagnostics.Assert(helperType != null, "no corresponding " + t.Type.FullName + "_<staticHelpers> type found");
                     foreach (var p in helperType.GetFields(BindingFlags.Static | BindingFlags.NonPublic))
                     {
@@ -2465,7 +2464,6 @@ namespace System.Management.Automation
                         rest.Add(Current(enumerator));
                     }
 
-
                     return rest.ToArray();
                 }
 
@@ -2644,7 +2642,6 @@ namespace System.Management.Automation
             return matches;
         }
 
-
         /// <summary>
         /// Implements the ForEach() operator.
         /// </summary>
@@ -2689,7 +2686,7 @@ namespace System.Management.Automation
                     }
 
                     // If it's a generic type then make sure it only has one type argument
-                    if (targetType.GetTypeInfo().IsGenericType)
+                    if (targetType.IsGenericType)
                     {
                         Type[] ta = targetType.GetGenericArguments();
                         if (ta.Length != 1)
@@ -3216,7 +3213,6 @@ namespace System.Management.Automation
                     e.Message);
             }
         }
-
 
         /// <summary>
         /// A routine used to advance an enumerator and catch errors that might occur

@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -427,7 +426,6 @@ namespace System.Management.Automation.Runspaces
         /// Create a CommandProcessorBase for this Command
         /// </summary>
         /// <param name="executionContext"></param>
-        /// <param name="commandFactory"></param>
         /// <param name="addToHistory"></param>
         /// <param name="origin"></param>
         /// <returns></returns>
@@ -436,14 +434,11 @@ namespace System.Management.Automation.Runspaces
         CreateCommandProcessor
         (
             ExecutionContext executionContext,
-            CommandFactory commandFactory,
             bool addToHistory,
             CommandOrigin origin
         )
         {
             Dbg.Assert(executionContext != null, "Caller should verify the parameters");
-            Dbg.Assert(commandFactory != null, "Caller should verify the parameters");
-
 
             CommandProcessorBase commandProcessorBase;
 
@@ -515,8 +510,7 @@ namespace System.Management.Automation.Runspaces
                     }
                 }
 
-                commandProcessorBase =
-                    commandFactory.CreateCommand(CommandText, origin, _useLocalScope);
+                commandProcessorBase = executionContext.CommandDiscovery.LookupCommandProcessor(CommandText, origin, _useLocalScope);
             }
 
             CommandParameterCollection parameters = Parameters;
@@ -562,7 +556,6 @@ namespace System.Management.Automation.Runspaces
         #endregion Private fields
 
         #region Serialization / deserialization for remoting
-
 
         /// <summary>
         /// Creates a Command object from a PSObject property bag.
@@ -647,7 +640,6 @@ namespace System.Management.Automation.Runspaces
 
             commandAsPSObject.Properties.Add(new PSNoteProperty(RemoteDataNameStrings.MergeUnclaimedPreviousCommandResults, this.MergeUnclaimedPreviousCommandResults));
 
-
             if (psRPVersion != null &&
                 psRPVersion >= RemotingConstants.ProtocolVersionWin10RTM)
             {
@@ -717,7 +709,6 @@ namespace System.Management.Automation.Runspaces
 
             return commandAsPSObject;
         }
-
 
         #endregion
 

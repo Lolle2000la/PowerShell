@@ -1,9 +1,7 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 #if !UNIX
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
-
-
 
 using System;
 using System.Management.Automation;
@@ -19,13 +17,11 @@ using ConsoleHandle = Microsoft.Win32.SafeHandles.SafeFileHandle;
 using WORD = System.UInt16;
 using DWORD = System.UInt32;
 
-
-
 namespace Microsoft.PowerShell
 {
     /// <summary>
     ///
-    /// implementation of RawConsole for powershell.exe
+    /// implementation of RawConsole for powershell
     ///
     /// </summary>
 
@@ -131,8 +127,6 @@ namespace Microsoft.PowerShell
             }
         }
 
-
-
         /// <summary>
         ///
         /// See base class
@@ -189,8 +183,6 @@ namespace Microsoft.PowerShell
             }
         }
 
-
-
         /// <summary>
         ///
         /// See base class
@@ -233,8 +225,6 @@ namespace Microsoft.PowerShell
                 ConsoleControl.SetConsoleCursorPosition(handle, value);
             }
         }
-
-
 
         /// <summary>
         ///
@@ -302,8 +292,6 @@ namespace Microsoft.PowerShell
                 }
             }
         }
-
-
 
         /// <summary>
         ///
@@ -375,8 +363,6 @@ namespace Microsoft.PowerShell
             }
         }
 
-
-
         /// <summary>
         ///
         /// See base class
@@ -435,8 +421,6 @@ namespace Microsoft.PowerShell
                 }
             }
         }
-
-
 
         /// <summary>
         ///
@@ -570,8 +554,6 @@ namespace Microsoft.PowerShell
             }
         }
 
-
-
         /// <summary>
         ///
         /// See base class
@@ -597,8 +579,6 @@ namespace Microsoft.PowerShell
                 return s;
             }
         }
-
-
 
         /// <summary>
         ///
@@ -741,8 +721,7 @@ namespace Microsoft.PowerShell
                             if (((ConsoleControl.InputRecordEventTypes)inputRecords[0].EventType) ==
                                 ConsoleControl.InputRecordEventTypes.KEY_EVENT)
                             {
-                                Dbg.Assert((inputRecords[0].KeyEvent.KeyDown && inputRecords[0].KeyEvent.RepeatCount != 0) ||
-                                    !inputRecords[0].KeyEvent.KeyDown,
+                                Dbg.Assert(!inputRecords[0].KeyEvent.KeyDown || inputRecords[0].KeyEvent.RepeatCount != 0,
                                     string.Format(CultureInfo.InvariantCulture, "ReadConsoleInput returns a KeyEvent that is KeyDown and RepeatCount 0"));
                                 if (inputRecords[0].KeyEvent.RepeatCount == 0)
                                 {
@@ -789,8 +768,6 @@ namespace Microsoft.PowerShell
             return keyInfo;
         }
 
-
-
         private static
         void
         KEY_EVENT_RECORDToKeyInfo(ConsoleControl.KEY_EVENT_RECORD keyEventRecord, out KeyInfo keyInfo)
@@ -801,8 +778,6 @@ namespace Microsoft.PowerShell
                 (ControlKeyStates)keyEventRecord.ControlKeyState,
                 keyEventRecord.KeyDown);
         }
-
-
 
         /// <summary>
         ///
@@ -826,8 +801,6 @@ namespace Microsoft.PowerShell
 
             cachedKeyEvent.RepeatCount = 0;
         }
-
-
 
         /// <summary>
         ///
@@ -867,8 +840,7 @@ namespace Microsoft.PowerShell
                     if (((ConsoleControl.InputRecordEventTypes)inputRecords[i].EventType) ==
                             ConsoleControl.InputRecordEventTypes.KEY_EVENT)
                     {
-                        Dbg.Assert((inputRecords[i].KeyEvent.KeyDown && inputRecords[i].KeyEvent.RepeatCount != 0) ||
-                            !inputRecords[i].KeyEvent.KeyDown,
+                        Dbg.Assert(!inputRecords[i].KeyEvent.KeyDown || inputRecords[i].KeyEvent.RepeatCount != 0,
                             string.Format(CultureInfo.InvariantCulture, "PeekConsoleInput returns a KeyEvent that is KeyDown and RepeatCount 0"));
 
                         if (inputRecords[i].KeyEvent.KeyDown && inputRecords[i].KeyEvent.RepeatCount == 0)
@@ -885,7 +857,6 @@ namespace Microsoft.PowerShell
                 return false;
             }
         }
-
 
         /// <summary>
         ///
@@ -1005,8 +976,6 @@ namespace Microsoft.PowerShell
 
             ConsoleControl.WriteConsoleOutput(handle, origin, contents);
         }
-
-
 
         /// <summary>
         ///
@@ -1187,8 +1156,6 @@ namespace Microsoft.PowerShell
             }
         }
 
-
-
         /// <summary>
         ///
         /// See base class.
@@ -1272,8 +1239,6 @@ namespace Microsoft.PowerShell
 
             return contents;
         }
-
-
 
         /// <summary>
         ///
@@ -1388,7 +1353,6 @@ namespace Microsoft.PowerShell
             return ConsoleControl.LengthInBufferCells(s, offset, parent.SupportsVirtualTerminal);
         }
 
-
         /// <summary>
         ///
         /// See base class
@@ -1425,7 +1389,6 @@ namespace Microsoft.PowerShell
 
 #region helpers
 
-
         // pass-by-ref for speed.
         /// <summary>
         ///
@@ -1457,7 +1420,6 @@ namespace Microsoft.PowerShell
             }
         }
 
-
         /// <summary>
         /// Get output buffer info
         /// </summary>
@@ -1476,8 +1438,6 @@ namespace Microsoft.PowerShell
             bufferInfo = ConsoleControl.GetConsoleScreenBufferInfo(result);
             return result;
         }
-
-
 
 #endregion helpers
 

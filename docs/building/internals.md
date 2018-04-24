@@ -16,7 +16,7 @@ We are calling `dotnet` tool build for `$Top` directory
 ### Dummy dependencies
 
 We use dummy dependencies between projects to leverage `dotnet` build functionality.
-For example, `src\powershell-win-core\powershell-win-core.csproj` has dependency on `Microsoft.PowerShell.PSReadLine`,
+For example, `src\powershell-win-core\powershell-win-core.csproj` has dependency on `Microsoft.PowerShell.Commands.Diagnostics.csproj`,
 but in reality, there is no build dependency.
 
 Dummy dependencies allows us to build just `$Top` folder, instead of building several folders.
@@ -44,11 +44,10 @@ dotnet run
 
 Running the program does everything else:
 
-- for each project, given a `resources` folder
-  - creates a `gen` folder
-  - for each `*.resx` file
-    - fills in a strongly typed C# class
-    - writes it out to the corresponding `*.cs` file
+- For each project, given a `resources` folder, create a `gen` folder.
+- For each `*.resx` file from the `resources` folder,
+  fill in a strongly typed C# class,
+  and write it out to the corresponding `*.cs` file in the `gen` folder.
 
 These files are *not* automatically updated on each build,
 as the project lacks the ability to detect changes.
@@ -87,7 +86,7 @@ cat > $targetFile <<-"EOF"
   </Target>
 </Project>
 EOF
-dotnet msbuild Microsoft.PowerShell.SDK/Microsoft.PowerShell.SDK.csproj /t:_GetDependencies "/property:DesignTimeBuild=true;_DependencyFile=$(pwd)/src/TypeCatalogGen/powershell.inc" /nologo
+dotnet msbuild Microsoft.PowerShell.SDK/Microsoft.PowerShell.SDK.csproj /t:_GetDependencies "/property:DesignTimeBuild=true;_DependencyFile=$(pwd)/TypeCatalogGen/powershell.inc" /nologo
 ```
 
 `powershell.inc` contains the resolved paths to the DLLs of each dependency of PowerShell,
@@ -97,3 +96,137 @@ which generates a source file `CorePsTypeCatalog.cs` for the `Microsoft.PowerShe
 The error `The name 'InitializeTypeCatalog' does not exist in the current context`
 indicates that the `CorePsTypeCatalog.cs` source file does not exist,
 so follow the steps to generate it.
+
+## Native Components
+
+On Windows, PowerShell Core depends on the WinRM plugin `pwrshplugin.dll` to enable remoting over WinRM.
+On Linux/macOS, PowerShell Core depends on the binary `libpsl-native.so/libpsl-native.dylib` to provide some necessary supports.
+
+Building those native components requires setting up additional dependencies,
+which could be a burden to those who don't seek to make changes to the native components.
+At the meantime, the native component code seldom changes,
+so it doesn't make sense to always build them with `Start-PSBuild`.
+Therefore, we decided to wrap the native components into NuGet packages,
+so that we only need to build them once when changes are made,
+and then reuse the produced binaries for many builds subsequently.
+
+The NuGet package for `pwrshplugin.dll` is `psrp.windows`,
+and the NuGet package for `libpsl-native` is `libpsl`.
+
+### Windows packages: PSRP.Windows and PowerShell.Core.Instrumentation
+
+To build `pwrshplugin.dll` and `PowerShell.Core.Instrumentation.dll`, you need to install Visual Studio 2017 and run `Start-PSBootstrap -BuildWindowsNative` to install the prerequisites.
+
+Ensure the following individual components are selected:
+
+- [ ] VC++ 2017 v141 toolset (x86, x64)
+- [ ] Visual C++ compilers and libraries for ARM
+- [ ] Visual C++ compilers and libraries for ARM64
+- [ ] Visual C++ tools for CMake
+- [ ] Visual C++ ATL Support
+- [ ] Windows 10 SDK (10.0.16299.0) for Desktop C++ (ARM and ARM64)
+- [ ] Windows 10 SDK (10.0.16299.0) for Desktop C++ (x86 and x64)
+
+Ensure [CMake](https://cmake.org/download/) 3.10.0 or newer is installed which supports VS2017 and ARM64 generator.
+
+Then run `Start-BuildNativeWindowsBinaries` to build the binary.
+For example, the following builds the release flavor of the binary targeting arm64 architecture.
+
+```powershell
+Start-BuildNativeWindowsBinaries -Configuration Release -Arch x64_arm64
+```
+
+Be sure to build and test for all supported architectures: `x86`, `x64`, `x64_arm`, and `x64_arm64`.
+
+The `x64_arm` and `x64_arm64` architectures mean that the host system needs to be x64 to cross-compile to ARM.
+When building for multiple architectures, be sure to use the `-clean` switch as cmake will cache the previous run and the wrong compiler will be used to generate the subsequent architectures.
+
+After that, the binary `pwrshplugin.dll`, its PDB file, and `powershell.core.instrumentation.dll` will be placed under 'src\powershell-win-core'.
+
+To create a new NuGet package for `pwrshplugin.dll`, first you need to get the `psrp.windows.nuspec` from an existing `psrp.windows` package.
+You can find it at `~/.nuget/packages/psrp.windows` on your windows machine if you have recently built PowerShell on it.
+Or you can download the existing package from [powershell-core feed](https://powershell.myget.org/feed/powershell-core/package/nuget/psrp.windows).
+Once you get `psrp.windows.nuspec`, copy it to an empty folder and update the `<version>` element.
+
+After building successfully, copy the produced files to the same folder,
+and create the same layout of files as in the existing package.
+The layout of files should look like this:
+
+```none
+\---runtimes
+    +---win-x64
+    |   \---native
+    |           pwrshplugin.dll
+    |           pwrshplugin.pdb
+    |
+    +---win-x86
+    |   \---native
+    |           pwrshplugin.dll
+    |           pwrshplugin.pdb
+    +---win-arm
+    |   \---native
+    |           pwrshplugin.dll
+    |           pwrshplugin.pdb
+    \---win-arm64
+        \---native
+                pwrshplugin.dll
+                pwrshplugin.pdb
+```
+
+Have the DLLs signed with `authenticode dual` certificate and run `nuget pack` from the parent of the `runtimes` folder where `psrp.windows.nuspec` resides.
+Be sure to use the latest recommended version of [nuget.exe](https://www.nuget.org/downloads).
+
+Publish latest nupkg to https://powershell.myget.org/feed/powershell-core/package/nuget/psrp.windows.
+
+`PowerShell.Core.Instrumentation.dll` NuGet package is created the same way, but in a separate directory following the same layout above.
+To create a new NuGet package for `PowerShell.Core.Instrumentation.dll`, you will need the `PowerShell.Core.Instrumentation.nuspec` found in the repo under `src\PowerShell.Core.Instrumentation`.
+
+Publish latest nupkg to https://powershell.myget.org/feed/powershell-core/package/nuget/PowerShell.Core.Instrumentation.
+
+### libpsl
+
+For `linux-arm`, you need to run `Start-PSBootstrap -BuildLinuxArm` to install additional prerequisites to build `libpsl-native`.
+Note that currently you can build `linux-arm` only on a Ubuntu machine.
+
+For `linux-x64` and macOS, the initial run of `Start-PSBootstrap` would be enough -- no additional prerequisite required.
+
+After making sure the prerequisites are met, run `Start-BuildNativeUnixBinaries` to build the binary:
+
+```powershell
+## Build targeting linux-x64 or macOS
+Start-BuildNativeUnixBinaries
+
+## Build targeting linux-arm
+Start-BuildNativeUnixBinaries -BuildLinuxArm
+```
+
+After the build succeeds, the binary `libpsl-native.so` (`libpsl-native.dylib` on macOS) will be placed under `src/powershell-unix`.
+
+To create a new NuGet package for `libpsl-native`, first you need to get the `libpsl.nuspec` from an existing `libpsl` package.
+You can find it at `~/.nuget/packages/libpsl` on your Linux or macOS machine if you have recently built PowerShell on it.
+Or you can download the existing package from [powershell-core feed](https://powershell.myget.org/feed/powershell-core/package/nuget/libpsl).
+Once you get `psrp.windows.nuspec`, copy it to an empty folder on your Windows machine.
+
+Then you need to build three binaries of `libpsl-native` targeting `linux-x64`, `linux-arm` and `osx` respectively.
+**Please note that, in order for the `linux-x64` binary `libpsl-native.so` to be portable to all other Linux distributions,
+the `linux-x64` binary needs to be built on CentOS 7**
+(.NET Core Linux native binaries are also built on CentOS 7  to ensure that they don't depend on newer `glibc`).
+
+After building successfully, copy those three binaries to the same folder,
+and create the same layout of files as in the existing package.
+The layout of files should look like this:
+
+```none
+└── runtimes
+    ├── linux-arm
+    │   └── native
+    │       └── libpsl-native.so
+    ├── linux-x64
+    │   └── native
+    │       └── libpsl-native.so
+    └── osx
+        └── native
+            └── libpsl-native.dylib
+```
+
+Lastly, run `nuget pack .` from within the folder. Note that you may need the latest `nuget.exe`.

@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 using System.Text;
@@ -9,12 +8,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Management.Automation;
 using System.Management.Automation.Internal;
-
-#if CORECLR
 using System.Net.Http;
-#else
-using System.Net;
-#endif
 
 namespace Microsoft.PowerShell.Commands
 {
@@ -229,43 +223,6 @@ namespace Microsoft.PowerShell.Commands
             base.Dispose(disposing);
         }
 
-#if !CORECLR
-        /// <summary>
-        ///
-        /// </summary>
-        public override IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
-        {
-            Initialize();
-            return base.BeginRead(buffer, offset, count, callback, state);
-        }
-
-        /// <summary>
-        ///
-        /// </summary>
-        public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
-        {
-            Initialize();
-            return base.BeginWrite(buffer, offset, count, callback, state);
-        }
-
-        /// <summary>
-        ///
-        /// </summary>
-        public override byte[] GetBuffer()
-        {
-            Initialize();
-            return base.GetBuffer();
-        }
-
-        /// <summary>
-        ///
-        /// </summary>
-        public override void Close()
-        {
-            base.Close();
-        }
-#endif
-
         /// <summary>
         ///
         /// </summary>
@@ -358,7 +315,6 @@ namespace Microsoft.PowerShell.Commands
                 }
             } while (read != 0);
 
-
             if (cmdlet != null)
             {
                 ProgressRecord record = new ProgressRecord(ActivityId,
@@ -386,9 +342,20 @@ namespace Microsoft.PowerShell.Commands
         /// <param name="cmdlet"></param>
         internal static void SaveStreamToFile(Stream stream, string filePath, PSCmdlet cmdlet)
         {
-            using (FileStream output = File.Create(filePath))
+            // If the web cmdlet should resume, append the file instead of overwriting.
+            if(cmdlet is WebRequestPSCmdlet webCmdlet && webCmdlet.ShouldResume)
             {
-                WriteToStream(stream, output, cmdlet);
+                using (FileStream output = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read))
+                {
+                    WriteToStream(stream, output, cmdlet);
+                }
+            }
+            else
+            {
+                using (FileStream output = File.Create(filePath))
+                {
+                    WriteToStream(stream, output, cmdlet);
+                }
             }
         }
 
@@ -516,7 +483,6 @@ namespace Microsoft.PowerShell.Commands
             return EncodeToBytes(str, null);
         }
 
-#if CORECLR
         internal static Stream GetResponseStream(HttpResponseMessage response)
         {
             Stream responseStream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
@@ -538,28 +504,6 @@ namespace Microsoft.PowerShell.Commands
 
             return responseStream;
         }
-#else
-        internal static Stream GetResponseStream(WebResponse response)
-        {
-            Stream responseStream = response.GetResponseStream();
-
-            // See if it had a content-encoding, wrap in a decoding stream if so.
-            string contentEncoding = response.Headers["Content-Encoding"];
-            if (contentEncoding != null)
-            {
-                if (contentEncoding.IndexOf("gzip", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    responseStream = new GZipStream(responseStream, CompressionMode.Decompress);
-                }
-                else if (contentEncoding.IndexOf("deflate", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    responseStream = new DeflateStream(responseStream, CompressionMode.Decompress);
-                }
-            }
-
-            return responseStream;
-        }
-#endif
 
         #endregion Static Methods
     }

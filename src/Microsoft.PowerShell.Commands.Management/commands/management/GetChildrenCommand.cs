@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 using System.Management.Automation;
@@ -278,7 +277,6 @@ namespace Microsoft.PowerShell.Commands
 
         #endregion command data
 
-
         #region command code
 
         /// <summary>
@@ -288,8 +286,7 @@ namespace Microsoft.PowerShell.Commands
         {
             CmdletProviderContext currentContext = CmdletProviderContext;
 
-            if (_paths == null ||
-                (_paths != null && _paths.Length == 0))
+            if (_paths == null || _paths.Length == 0)
             {
                 _paths = new string[] { String.Empty };
             }

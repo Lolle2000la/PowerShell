@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections;
 using System.Collections.ObjectModel;
@@ -111,7 +110,6 @@ namespace System.Management.Automation
             _engine = context.EngineIntrinsics;
             _isTranscribing = context.EngineHostInterface.UI.IsTranscribing;
         }
-
 
         /// <summary>
         /// Constructs the parameter binder with the specified type metadata. The binder is only valid
@@ -787,18 +785,26 @@ namespace System.Management.Automation
 
             // Ensure that each element abides by the metadata
             bool isEmpty = true;
+            Type elementType = parameterMetadata.CollectionTypeInformation.ElementType;
+            bool isElementValueType = elementType != null && elementType.IsValueType;
+
             // Note - we explicitly don't pass the context here because we don't want
             // the overhead of the calls that check for stopping.
-            while (ParserOps.MoveNext(null, null, ienum))
+            if (ParserOps.MoveNext(null, null, ienum)) { isEmpty = false; }
+
+            // If the element of the collection is of value type, then no need to check for null
+            // because a value-type value cannot be null.
+            if (!isEmpty && !isElementValueType)
             {
-                object element = ParserOps.Current(null, ienum);
-                isEmpty = false;
-                ValidateNullOrEmptyArgument(
-                    parameter,
-                    parameterMetadata,
-                    parameterMetadata.CollectionTypeInformation.ElementType,
-                    element,
-                    false);
+                do {
+                    object element = ParserOps.Current(null, ienum);
+                    ValidateNullOrEmptyArgument(
+                        parameter,
+                        parameterMetadata,
+                        parameterMetadata.CollectionTypeInformation.ElementType,
+                        element,
+                        false);
+                } while (ParserOps.MoveNext(null, null, ienum));
             }
 
             if (isEmpty && !parameterMetadata.AllowsEmptyCollectionArgument)
@@ -844,7 +850,7 @@ namespace System.Management.Automation
             {
                 return parameterType == null ||
                        isDefaultValue ||
-                       (!parameterType.GetTypeInfo().IsValueType &&
+                       (!parameterType.IsValueType &&
                         parameterType != typeof(string));
             }
 
@@ -1121,7 +1127,6 @@ namespace System.Management.Automation
                                 boType = argumentType;
                             }
 
-
                             if (boType == typeof(bool))
                             {
                                 if (LanguagePrimitives.IsBooleanType(toType))
@@ -1191,7 +1196,6 @@ namespace System.Management.Automation
                             break;
                         }
 
-
                         // NTRAID#Windows OS Bugs-1009284-2004/05/05-JeffJon
                         // Need to handle other collection types here as well
 
@@ -1241,14 +1245,13 @@ namespace System.Management.Automation
                             // we don't want to attempt to bind a collection to a scalar unless
                             // the parameter type is Object or PSObject or enum.
 
-                            TypeInfo toTypeInfo = toType.GetTypeInfo();
                             if (GetIList(currentValue) != null &&
                                 toType != typeof(Object) &&
                                 toType != typeof(PSObject) &&
                                 toType != typeof(PSListModifier) &&
-                                (!toTypeInfo.IsGenericType || toTypeInfo.GetGenericTypeDefinition() != typeof(PSListModifier<>)) &&
-                                (!toTypeInfo.IsGenericType || toTypeInfo.GetGenericTypeDefinition() != typeof(FlagsExpression<>)) &&
-                                !toTypeInfo.IsEnum)
+                                (!toType.IsGenericType || toType.GetGenericTypeDefinition() != typeof(PSListModifier<>)) &&
+                                (!toType.IsGenericType || toType.GetGenericTypeDefinition() != typeof(FlagsExpression<>)) &&
+                                !toType.IsEnum)
                             {
                                 throw new NotSupportedException();
                             }

@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -52,48 +51,6 @@ namespace System.Management.Automation
         }
         private Dictionary<ProviderInfo, PSDriveInfo> _providersCurrentWorkingDrive = new Dictionary<ProviderInfo, PSDriveInfo>();
 
-        private bool _providersInitialized = false;
-
-        /// <summary>
-        /// Gets called by the RunspaceConfiguration when a PSSnapin gets added or removed.
-        /// </summary>
-        ///
-        internal void UpdateProviders()
-        {
-            // This should only be called from Update() on a runspace configuration q.e.d. runspace configuration
-            // should never be null when this gets called...
-            if (this.ExecutionContext.RunspaceConfiguration == null)
-                throw PSTraceSource.NewInvalidOperationException();
-
-            if (this == ExecutionContext.TopLevelSessionState && !_providersInitialized)
-            {
-                foreach (ProviderConfigurationEntry providerConfig in this.ExecutionContext.RunspaceConfiguration.Providers)
-                {
-                    AddProvider(providerConfig);
-                }
-
-                _providersInitialized = true;
-                return;
-            }
-
-            foreach (ProviderConfigurationEntry providerConfig in this.ExecutionContext.RunspaceConfiguration.Providers.UpdateList)
-            {
-                switch (providerConfig.Action)
-                {
-                    case UpdateAction.Add:
-                        AddProvider(providerConfig);
-                        break;
-
-                    case UpdateAction.Remove:
-                        RemoveProvider(providerConfig);
-                        break;
-
-                    default:
-                        break;
-                }
-            }
-        }
-
         /// <summary>
         /// Entrypoint used by to add a provider to the current session state
         /// based on a SessionStateProviderEntry.
@@ -101,26 +58,11 @@ namespace System.Management.Automation
         /// <param name="providerEntry"></param>
         internal void AddSessionStateEntry(SessionStateProviderEntry providerEntry)
         {
-            ProviderInfo provider = AddProvider(providerEntry.ImplementingType,
-                            providerEntry.Name,
-                            providerEntry.HelpFileName,
-                            providerEntry.PSSnapIn,
-                            providerEntry.Module
-            );
-        }
-
-        /// <summary>
-        /// Internal method used by RunspaceConfig for updating providers.
-        /// </summary>
-        /// <param name="providerConfig"></param>
-        private ProviderInfo AddProvider(ProviderConfigurationEntry providerConfig)
-        {
-            return AddProvider(providerConfig.ImplementingType,
-                            providerConfig.Name,
-                            providerConfig.HelpFileName,
-                            providerConfig.PSSnapIn,
-                            null
-            );
+            AddProvider(providerEntry.ImplementingType,
+                        providerEntry.Name,
+                        providerEntry.HelpFileName,
+                        providerEntry.PSSnapIn,
+                        providerEntry.Module);
         }
 
         private ProviderInfo AddProvider(Type implementingType, string name, string helpFileName, PSSnapInInfo psSnapIn, PSModuleInfo module)
@@ -178,7 +120,6 @@ namespace System.Management.Automation
             }
             return provider;
         }
-
 
         /// <summary>
         /// Determines the appropriate provider for the drive and then calls the NewDrive
@@ -1028,7 +969,7 @@ namespace System.Management.Automation
                 }
             }
 
-            if (ExecutionContext.IsSingleShell && !String.IsNullOrEmpty(providerName.PSSnapInName))
+            if (!String.IsNullOrEmpty(providerName.PSSnapInName))
             {
                 // Be sure the PSSnapin/Module name matches
 
@@ -1234,8 +1175,6 @@ namespace System.Management.Automation
             }
         } // InitializeProvider
 
-
-
         /// <summary>
         /// Creates and adds a provider to the provider container
         /// </summary>
@@ -1289,7 +1228,6 @@ namespace System.Management.Automation
 
                 throw sessionStateException;
             }
-
 
             // Make sure we are able to create an instance of the provider.
             // Note, this will also set the friendly name if the user didn't
@@ -1511,51 +1449,6 @@ namespace System.Management.Automation
         #endregion NewProvider
 
         #region Remove Provider
-
-        private void RemoveProvider(ProviderConfigurationEntry entry)
-        {
-            try
-            {
-                CmdletProviderContext context = new CmdletProviderContext(this.ExecutionContext);
-
-                string providerName = GetProviderName(entry);
-                RemoveProvider(providerName, true, context);
-
-                context.ThrowFirstErrorOrDoNothing();
-            }
-            catch (LoopFlowException)
-            {
-                throw;
-            }
-            catch (PipelineStoppedException)
-            {
-                throw;
-            }
-            catch (ActionPreferenceStopException)
-            {
-                throw;
-            }
-            catch (Exception e) // Catch-all OK, 3rd party callout
-            {
-                // NTRAID#Windows OS Bugs-1009281-2004/02/11-JeffJon
-                this.ExecutionContext.ReportEngineStartupError(e);
-            }
-        }
-
-        private string GetProviderName(ProviderConfigurationEntry entry)
-        {
-            string name = entry.Name;
-            if (entry.PSSnapIn != null)
-            {
-                name =
-                    string.Format(
-                        System.Globalization.CultureInfo.InvariantCulture,
-                        "{0}\\{1}",
-                        entry.PSSnapIn.Name,
-                        entry.Name);
-            }
-            return name;
-        }
 
         /// <summary>
         /// Removes the provider of the given name.

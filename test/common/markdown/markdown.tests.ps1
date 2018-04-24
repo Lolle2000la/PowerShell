@@ -1,3 +1,5 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
 $moduleRootFilePath = Split-Path -Path $PSScriptRoot -Parent
 
 # Identify the repository root path of the resource module
@@ -8,10 +10,10 @@ Describe 'Common Tests - Validate Markdown Files' -Tag 'CI' {
     BeforeAll {
         # Skip if not windows, We don't need these tests to run on linux (the tests run fine in travis-ci)
         $skip = !$IsWindows
-        if ( !$skip ) 
+        if ( !$skip )
         {
             $NpmInstalled = "not installed"
-            if (Get-Command -Name 'npm' -ErrorAction SilentlyContinue) 
+            if (Get-Command -Name 'npm' -ErrorAction SilentlyContinue)
             {
                 $NpmInstalled = "Installed"
                 Write-Verbose -Message "NPM is checking Gulp is installed. This may take a few moments." -Verbose
@@ -27,10 +29,10 @@ Describe 'Common Tests - Validate Markdown Files' -Tag 'CI' {
                     -Wait `
                     -WorkingDirectory $PSScriptRoot `
                     -NoNewWindow
-            } 
+            }
             elseif( -not $env:AppVeyor)
             {
-                <# 
+                <#
                     On Windows, but not an AppVeyor and pre-requisites are missing
                     For now we will skip, and write a warning.  Work to resolve this is tracked in:
                     https://github.com/PowerShell/PowerShell/issues/3429
@@ -42,9 +44,9 @@ Describe 'Common Tests - Validate Markdown Files' -Tag 'CI' {
     }
 
     AfterAll {
-        if ( !$skip ) 
+        if ( !$skip )
         {
-            <# 
+            <#
                 NPM install all the tools needed to run this test in the test folder.
                 We will now clean these up.
                 We're using this tool to delete the node_modules folder because it gets too long
@@ -72,14 +74,19 @@ Describe 'Common Tests - Validate Markdown Files' -Tag 'CI' {
         try
         {
             $docsToTest = @(
-                './*.md'
-                './docs/*.md'
-                './docs/installation/*.md'
-                './docs/maintainers/README.md'
-                './demos/SSHRemoting/*.md'
-                './docker/*.md'
-                './tools/*.md'
                 './.github/CONTRIBUTING.md'
+                './*.md'
+                './demos/python/*.md'
+                './docker/*.md'
+                './docs/*.md'
+                './docs/building/*.md'
+                './docs/cmdlet-example/*.md'
+                './docs/git/submodules.md'
+                './docs/installation/*.md'
+                './docs/maintainers/*.md'
+                './docs/testing-guidelines/testing-guidelines.md'
+                './test/powershell/README.md'
+                './tools/*.md'
             )
             $filter = ($docsToTest -join ',')
             &"gulp" test-mdsyntax --silent `

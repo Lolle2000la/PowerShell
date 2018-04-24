@@ -1,8 +1,64 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
 param(
-    [switch]$Bootstrap
+    [ValidateSet('Bootstrap','Build','Failure','Success')]
+    [String]$Stage = 'Build'
 )
+
 Import-Module $PSScriptRoot/../build.psm1 -Force
 Import-Module $PSScriptRoot/packaging -Force
+
+function Send-DailyWebHook
+{
+    param (
+        [Parameter(Mandatory=$true,Position=0)][ValidateSet("Pass","Fail")]$result
+        )
+
+    # Only send web hook if the environment variable is present
+    # Varible should be set in Travis-CI.org settings
+    if ($env:WebHookUrl)
+    {
+        Write-Log "Sending DailyWebHook with result '$result'."
+        $webhook = $env:WebHookUrl
+
+        $Body = @{
+                'text'= @"
+Build Result: $result </br>
+OS Type: $($PSVersionTable.OS) </br>
+<a href="https://travis-ci.org/$env:TRAVIS_REPO_SLUG/builds/$env:TRAVIS_BUILD_ID">Build $env:TRAVIS_BUILD_NUMBER</a>  </br>
+<a href="https://travis-ci.org/$env:TRAVIS_REPO_SLUG/jobs/$env:TRAVIS_JOB_ID">Job $env:TRAVIS_JOB_NUMBER</a>
+"@
+        }
+
+        $params = @{
+            Headers = @{'accept'='application/json'}
+            Body = $Body | convertto-json
+            Method = 'Post'
+            URI = $webhook
+        }
+
+        Invoke-RestMethod @params
+    }
+    else
+    {
+        Write-Log "Skipping DailyWebHook.  WebHookUrl environment variable not present."
+    }
+}
+
+function Get-ReleaseTag
+{
+    $metaDataPath = Join-Path -Path $PSScriptRoot -ChildPath 'metadata.json'
+    $metaData = Get-Content $metaDataPath | ConvertFrom-Json
+
+    $releaseTag = $metadata.NextReleaseTag
+    if($env:TRAVIS_BUILD_NUMBER)
+    {
+        $releaseTag = $releaseTag.split('.')[0..2] -join '.'
+        $releaseTag = $releaseTag+'.'+$env:TRAVIS_BUILD_NUMBER
+    }
+
+    return $releaseTag
+}
 
 # This function retrieves the appropriate svg to be used when presenting
 # the daily test run badge
@@ -86,13 +142,12 @@ function Set-DailyBuildBadge
 
     $headers["Authorization"]  = "SharedKey " + $storageAccountName + ":" + $signature
 
-    if ( $PSCmdlet.ShouldProcess("$signaturestring")) 
+    if ( $PSCmdlet.ShouldProcess("$signaturestring"))
     {
         # if this fails, it will throw, you can't check the response for a success code
         $response = Invoke-RestMethod -Uri $Url -Method $method -headers $headers -Body $body -ContentType "image/svg+xml"
     }
 }
-
 
 # https://docs.travis-ci.com/user/environment-variables/
 # TRAVIS_EVENT_TYPE: Indicates how the build was triggered.
@@ -102,68 +157,63 @@ $isPR = $env:TRAVIS_EVENT_TYPE -eq 'pull_request'
 # For PRs, Travis-ci strips out [ and ] so read the message directly from git
 if($env:TRAVIS_EVENT_TYPE -eq 'pull_request')
 {
-    # Get the second log entry body
-    # The first log is a merge for a PR
-    $commitMessage = git log --format=%B -n 1 --skip=1
+    # If the current job is a pull request, the env variable 'TRAVIS_PULL_REQUEST_SHA' contains
+    # the commit SHA of the HEAD commit of the PR.
+    $commitMessage = git log --format=%B -n 1 $env:TRAVIS_PULL_REQUEST_SHA
 }
 else
 {
     $commitMessage = $env:TRAVIS_COMMIT_MESSAGE
 }
 
-
 # Run a full build if the build was trigger via cron, api or the commit message contains `[Feature]`
 $hasFeatureTag = $commitMessage -match '\[feature\]'
+$hasPackageTag = $commitMessage -match '\[package\]'
+$createPackages = -not $isPr -or $hasPackageTag
 $hasRunFailingTestTag = $commitMessage -match '\[includeFailingTest\]'
 $isDailyBuild = $env:TRAVIS_EVENT_TYPE -eq 'cron' -or $env:TRAVIS_EVENT_TYPE -eq 'api'
 # only update the build badge for the cron job
 $cronBuild = $env:TRAVIS_EVENT_TYPE -eq 'cron'
 $isFullBuild = $isDailyBuild -or $hasFeatureTag
 
-if($Bootstrap.IsPresent)
+if($Stage -eq 'Bootstrap')
 {
     Write-Host -Foreground Green "Executing travis.ps1 -BootStrap `$isPR='$isPr' - $commitMessage"
     # Make sure we have all the tags
     Sync-PSTags -AddRemoteIfMissing
-    Start-PSBootstrap -Package:(-not $isPr)
+    Start-PSBootstrap -Package:$createPackages
 }
-else 
+elseif($Stage -eq 'Build')
 {
-    $BaseVersion = (Get-PSVersion -OmitCommitId) + '-'
+    $releaseTag = Get-ReleaseTag
+
     Write-Host -Foreground Green "Executing travis.ps1 `$isPR='$isPr' `$isFullBuild='$isFullBuild' - $commitMessage"
     $output = Split-Path -Parent (Get-PSOutput -Options (New-PSOptions))
 
-    # CrossGen'ed assemblies cause a hang to happen intermittently when running powershell class
-    # basic parsing tests in Linux/macOS. The hang seems to happen when generating dynamic assemblies.
-    # This issue has been reported to CoreCLR team. We need to work around it for now because
-    # the Travis CI build failures caused by this is draining our builder resource and severely
-    # affect our daily work. The workaround is:
-    #  1. For pull request and push commit, build without '-CrossGen' and run the parsing tests
-    #  2. For nightly build, build with '-CrossGen' but don't run the parsing tests
-    # With this workaround, CI builds triggered by pull request and push commit will exercise
-    # the parsing tests with IL assemblies, while nightly builds will exercise CrossGen'ed assemblies
-    # without running those class parsing tests so as to avoid the hang.
-    # NOTE: this change should be reverted once the 'CrossGen' issue is fixed by CoreCLR. The issue
-    #       is tracked by https://github.com/dotnet/coreclr/issues/9745
     $originalProgressPreference = $ProgressPreference
-    $ProgressPreference = 'SilentlyContinue' 
+    $ProgressPreference = 'SilentlyContinue'
     try {
         ## We use CrossGen build to run tests only if it's the daily build.
-        Start-PSBuild -CrossGen:$isDailyBuild -PSModuleRestore
+        Start-PSBuild -CrossGen -PSModuleRestore -CI -ReleaseTag $releaseTag
     }
     finally{
-        $ProgressPreference = $originalProgressPreference    
+        $ProgressPreference = $originalProgressPreference
     }
 
-    $pesterParam = @{ 
-        'binDir'   = $output 
-        'PassThru' = $true
-        'Terse'    = $true
+    $testResultsNoSudo = "$pwd/TestResultsNoSudo.xml"
+    $testResultsSudo = "$pwd/TestResultsSudo.xml"
+
+    $pesterParam = @{
+        'binDir'     = $output
+        'PassThru'   = $true
+        'Terse'      = $true
+        'Tag'        = @()
+        'ExcludeTag' = @('RequireSudoOnUnix')
+        'OutputFile' = $testResultsNoSudo
     }
 
     if ($isFullBuild) {
         $pesterParam['Tag'] = @('CI','Feature','Scenario')
-        $pesterParam['ExcludeTag'] = @()
     } else {
         $pesterParam['Tag'] = @('CI')
         $pesterParam['ThrowOnFailure'] = $true
@@ -174,18 +224,20 @@ else
         $pesterParam['IncludeFailingTest'] = $true
     }
 
-    # Remove telemetry semaphore file in CI
-    $telemetrySemaphoreFilepath = Join-Path $output DELETE_ME_TO_DISABLE_CONSOLEHOST_TELEMETRY
-    if ( Test-Path "${telemetrySemaphoreFilepath}" ) {
-        Remove-Item -force ${telemetrySemaphoreFilepath}
-    }
+    # Running tests which do not require sudo.
+    $pesterPassThruNoSudoObject = Start-PSPester @pesterParam
 
-    $pesterPassThruObject = Start-PSPester @pesterParam
+    # Running tests, which require sudo.
+    $pesterParam['Tag'] = @('RequireSudoOnUnix')
+    $pesterParam['ExcludeTag'] = @()
+    $pesterParam['Sudo'] = $true
+    $pesterParam['OutputFile'] = $testResultsSudo
+    $pesterPassThruSudoObject = Start-PSPester @pesterParam
 
     # Determine whether the build passed
     try {
         # this throws if there was an error
-        Test-PSPesterResults -ResultObject $pesterPassThruObject
+        @($pesterPassThruNoSudoObject, $pesterPassThruSudoObject) | ForEach-Object { Test-PSPesterResults -ResultObject $_ }
         $result = "PASS"
     }
     catch {
@@ -193,17 +245,27 @@ else
         $result = "FAIL"
     }
 
-    if (-not $isPr) {
-        # Run 'CrossGen' for push commit, so that we can generate package.
-        # It won't rebuild powershell, but only CrossGen the already built assemblies.
-        if (-not $isDailyBuild) { Start-PSBuild -CrossGen }
-        
-        $packageParams = @{}
-        if($env:TRAVIS_BUILD_NUMBER)
+    try {
+        $SequentialXUnitTestResultsFile = "$pwd/SequentialXUnitTestResults.xml"
+        $ParallelXUnitTestResultsFile = "$pwd/ParallelXUnitTestResults.xml"
+
+        Start-PSxUnit -SequentialTestResultsFile $SequentialXUnitTestResultsFile -ParallelTestResultsFile $ParallelXUnitTestResultsFile
+        # If there are failures, Test-XUnitTestResults throws
+        $SequentialXUnitTestResultsFile, $ParallelXUnitTestResultsFile | ForEach-Object { Test-XUnitTestResults -TestResultsFile $_ }
+    }
+    catch {
+        $result = "FAIL"
+        if (!$resultError)
         {
-            $version = $BaseVersion + $env:TRAVIS_BUILD_NUMBER
-            $packageParams += @{Version=$version}
+            $resultError = $_
         }
+    }
+
+    if ($createPackages) {
+
+        $packageParams = @{}
+        $packageParams += @{ReleaseTag=$releaseTag}
+
         # Only build packages for branches, not pull requests
         $packages = @(Start-PSPackage @packageParams -SkipReleaseChecks)
         # Packaging AppImage depends on the deb package
@@ -216,26 +278,15 @@ else
             # 3 - it's a nupkg file
             if($isDailyBuild -and $env:NUGET_KEY -and $env:NUGET_URL -and [system.io.path]::GetExtension($package) -ieq '.nupkg')
             {
-                log "pushing $package to $env:NUGET_URL"
+                Write-Log "pushing $package to $env:NUGET_URL"
                 Start-NativeExecution -sb {dotnet nuget push $package --api-key $env:NUGET_KEY --source "$env:NUGET_URL/api/v2/package"} -IgnoreExitcode
-            }            
+            }
         }
-
-        # update the badge if you've done a cron build, these are not fatal issues
-        if ( $cronBuild ) {
-            try {
-                $svgData = Get-DailyBadge -result $result
-                if ( ! $svgData ) {
-                    write-warning "Could not retrieve $result badge"
-                }
-                else {
-                    Write-Verbose -verbose "Setting status badge to '$result'"
-                    Set-DailyBuildBadge -content $svgData
-                }
-            }
-            catch {
-                Write-Warning "Could not update status badge: $_"
-            }
+        if ($IsLinux)
+        {
+            # Create and package Raspbian .tgz
+            Start-PSBuild -PSModuleRestore -Clean -Runtime linux-arm
+            Start-PSPackage @packageParams -Type tar-arm -SkipReleaseChecks
         }
     }
 
@@ -243,6 +294,40 @@ else
     if ( $result -eq "FAIL" ) {
         Throw $resultError
     }
+}
+elseif($Stage -in 'Failure', 'Success')
+{
+    $result = 'PASS'
+    if($Stage -eq 'Failure')
+    {
+        $result = 'FAIL'
+    }
 
-    Start-PSxUnit
+    if ($cronBuild) {
+        # update the badge if you've done a cron build, these are not fatal issues
+        try {
+            $svgData = Get-DailyBadge -result $result
+            if ( ! $svgData ) {
+                write-warning "Could not retrieve $result badge"
+            }
+            else {
+                Write-Log "Setting status badge to '$result'"
+                Set-DailyBuildBadge -content $svgData
+            }
+        }
+        catch {
+            Write-Warning "Could not update status badge: $_"
+        }
+
+        try {
+            Send-DailyWebHook -result $result
+        }
+        catch {
+            Write-Warning "Could not send webhook: $_"
+        }
+    }
+    else {
+        Write-Log 'We only send bagde or webhook update for Cron builds'
+    }
+
 }

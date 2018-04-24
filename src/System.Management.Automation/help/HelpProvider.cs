@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.IO;
 using System.Collections.Generic;
@@ -215,7 +214,7 @@ namespace System.Management.Automation
         internal void ReportHelpFileError(Exception exception, string target, string helpFile)
         {
             ErrorRecord errorRecord = new ErrorRecord(exception, "LoadHelpFileForTargetFailed", ErrorCategory.OpenError, null);
-            errorRecord.ErrorDetails = new ErrorDetails(typeof(HelpProvider).GetTypeInfo().Assembly, "HelpErrors", "LoadHelpFileForTargetFailed", target, helpFile, exception.Message);
+            errorRecord.ErrorDetails = new ErrorDetails(typeof(HelpProvider).Assembly, "HelpErrors", "LoadHelpFileForTargetFailed", target, helpFile, exception.Message);
             this.HelpSystem.LastErrors.Add(errorRecord);
             return;
         }
@@ -238,17 +237,6 @@ namespace System.Management.Automation
             }
 
             return returnValue;
-        }
-
-        /// <summary>
-        /// Helper function which checks whether PSSnapIns are supported in current invocation.
-        /// </summary>
-        /// <returns>true if supported,false otherwise.</returns>
-        internal bool AreSnapInsSupported()
-        {
-            RunspaceConfigForSingleShell runspace = _helpSystem.ExecutionContext.RunspaceConfiguration as RunspaceConfigForSingleShell;
-
-            return (null == runspace ? false : true);
         }
 
         /// <summary>

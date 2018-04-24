@@ -1,7 +1,7 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 #if !UNIX
-//
-//    Copyright (C) Microsoft.  All rights reserved.
-//
+
 using System.Collections.Generic;
 using System.Diagnostics.Eventing;
 using System.Diagnostics;
@@ -251,7 +251,6 @@ namespace System.Management.Automation.Tracing
             }
         }
 
-        private static Guid powerShellProviderId = Guid.Parse("A0C1853B-5C40-4b15-8766-3CF1C58F985A");
         private static Dictionary<Guid, EventProvider> providers = new Dictionary<Guid, EventProvider>();
         private static object syncLock = new object();
 
@@ -431,7 +430,7 @@ namespace System.Management.Automation.Tracing
         {
             get
             {
-                return powerShellProviderId;
+                return PSEtwLogProvider.ProviderGuid;
             }
         }
 
@@ -539,6 +538,5 @@ namespace System.Management.Automation.Tracing
         }
     }
 }
-
 
 #endif

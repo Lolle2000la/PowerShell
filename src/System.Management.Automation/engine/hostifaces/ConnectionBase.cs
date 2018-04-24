@@ -1,6 +1,5 @@
-/********************************************************************++
- * Copyright (c) Microsoft Corporation.  All rights reserved.
- * --********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections.Generic;
 using System.Linq;
@@ -37,22 +36,14 @@ namespace System.Management.Automation.Runspaces
         /// <exception cref="System.ArgumentNullException">
         /// host is null.
         /// </exception>
-        /// <param name="runspaceConfiguration">
-        /// configuration information for this minshell.
-        /// </param>
-        protected RunspaceBase(PSHost host, RunspaceConfiguration runspaceConfiguration)
+        protected RunspaceBase(PSHost host)
         {
             if (host == null)
             {
                 throw PSTraceSource.NewArgumentNullException("host");
             }
-            if (runspaceConfiguration == null)
-            {
-                throw PSTraceSource.NewArgumentNullException("runspaceConfiguration");
-            }
-
+            InitialSessionState = InitialSessionState.CreateDefault();
             Host = host;
-            RunspaceConfiguration = runspaceConfiguration;
         }
 
         /// <summary>
@@ -143,17 +134,7 @@ namespace System.Management.Automation.Runspaces
         protected PSHost Host { get; }
 
         /// <summary>
-        /// runspaceConfiguration information for this runspace
-        /// </summary>
-#if CORECLR
-        internal
-#else
-        public
-#endif
-        override RunspaceConfiguration RunspaceConfiguration { get; }
-
-        /// <summary>
-        /// runspaceConfiguration information for this runspace
+        /// InitialSessionState information for this runspace
         /// </summary>
         public override InitialSessionState InitialSessionState { get; }
 
@@ -294,12 +275,10 @@ namespace System.Management.Automation.Runspaces
 #endif
         }
 
-
         /// <summary>
         /// Derived class's open implementation
         /// </summary>
         protected abstract void OpenHelper(bool syncCall);
-
 
         #endregion open
 
@@ -434,7 +413,6 @@ namespace System.Management.Automation.Runspaces
             //Call the derived class implementation to do the actual work
             CloseHelper(syncCall);
         }
-
 
         /// <summary>
         /// Derived class's close implementation
@@ -759,7 +737,6 @@ namespace System.Management.Automation.Runspaces
             this.SetRunspaceState(state, null);
         }
 
-
         /// <summary>
         /// Raises events for changes in runspace state.
         /// </summary>
@@ -970,7 +947,6 @@ namespace System.Management.Automation.Runspaces
                 return true;
             }
         }
-
 
         /// <summary>
         /// Stops all the running pipelines
@@ -1527,7 +1503,6 @@ namespace System.Management.Automation.Runspaces
                 }
             }
         }
-
 
         /// <summary>
         /// Protected methods to be implemented by derived class.

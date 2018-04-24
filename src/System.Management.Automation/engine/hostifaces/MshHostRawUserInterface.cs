@@ -1,7 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
-
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Globalization;
 
@@ -14,8 +12,6 @@ namespace System.Management.Automation.Host
     // I would have preferred to make these nested types within PSHostRawUserInterface, but that
     // is evidently discouraged by the .net design guidelines.
 
-
-
     /// <summary>
     ///
     /// Represents an (x,y) coordinate pair
@@ -25,9 +21,12 @@ namespace System.Management.Automation.Host
     public
     struct Coordinates
     {
-        // DO NOT REMOVE OR RENAME THESE FIELDS - it will break remoting
+        #region DO NOT REMOVE OR RENAME THESE FIELDS - it will break remoting compatibility with Windows PowerShell
+
         private int x;
         private int y;
+
+        #endregion
 
         /// <summary>
         ///
@@ -51,7 +50,6 @@ namespace System.Management.Automation.Host
             set { y = value; }
         }
 
-
         /// <summary>
         ///
         /// Initializes a new instance of the Coordinates class and defines the X and Y values.
@@ -74,8 +72,6 @@ namespace System.Management.Automation.Host
             this.y = y;
         }
 
-
-
         /// <summary>
         ///
         /// Overrides <see cref="System.Object.ToString"/>
@@ -93,8 +89,6 @@ namespace System.Management.Automation.Host
         {
             return String.Format(CultureInfo.InvariantCulture, "{0},{1}", X, Y);
         }
-
-
 
         /// <summary>
         ///
@@ -126,8 +120,6 @@ namespace System.Management.Automation.Host
 
             return result;
         }
-
-
 
         /// <summary>
         ///
@@ -193,8 +185,6 @@ namespace System.Management.Automation.Host
             return result;
         }
 
-
-
         /// <summary>
         ///
         /// Compares two instances for equality
@@ -225,8 +215,6 @@ namespace System.Management.Automation.Host
             return result;
         }
 
-
-
         /// <summary>
         ///
         /// Compares two instances for inequality
@@ -256,8 +244,6 @@ namespace System.Management.Automation.Host
         }
     }
 
-
-
     /// <summary>
     ///
     /// Represents a width and height pair
@@ -267,9 +253,12 @@ namespace System.Management.Automation.Host
     public
     struct Size
     {
-        // DO NOT REMOVE OR RENAME THESE FIELDS - it will break remoting
+        #region DO NOT REMOVE OR RENAME THESE FIELDS - it will break remoting compatibility with Windows PowerShell
+
         private int width;
         private int height;
+
+        #endregion
 
         /// <summary>
         ///
@@ -293,7 +282,6 @@ namespace System.Management.Automation.Host
             set { height = value; }
         }
 
-
         /// <summary>
         ///
         /// Initialize a new instance of the Size class and defines the Width and Height values.
@@ -315,8 +303,6 @@ namespace System.Management.Automation.Host
             this.width = width;
             this.height = height;
         }
-
-
 
         /// <summary>
         ///
@@ -493,8 +479,6 @@ namespace System.Management.Automation.Host
         }
     }
 
-
-
     /// <summary>
     ///
     /// Governs the behavior of <see cref="System.Management.Automation.Host.PSHostRawUserInterface.ReadKey()"/>
@@ -539,8 +523,6 @@ namespace System.Management.Automation.Host
 
         IncludeKeyUp = 0x0008
     }
-
-
 
     /// <summary>
     ///
@@ -607,8 +589,6 @@ namespace System.Management.Automation.Host
         EnhancedKey = 0x0100
     }
 
-
-
     /// <summary>
     ///
     /// Represents information of a keystroke
@@ -618,34 +598,56 @@ namespace System.Management.Automation.Host
     public
     struct KeyInfo
     {
+        #region DO NOT REMOVE OR RENAME THESE FIELDS - it will break remoting compatibility with Windows PowerShell
+
+        private int virtualKeyCode;
+        private char character;
+        private ControlKeyStates controlKeyState;
+        private bool keyDown;
+
+        #endregion
+
         /// <summary>
         ///
         /// Gets and set device-independent key
         ///
         /// </summary>
 
-        public int VirtualKeyCode { get; set; }
-
+        public int VirtualKeyCode
+        {
+            get { return virtualKeyCode; }
+            set { virtualKeyCode = value; }
+        }
 
         /// <summary>
         /// Gets and set unicode Character of the key
         /// </summary>
 
-        public char Character { get; set; }
-
+        public char Character
+        {
+            get { return character; }
+            set { character = value; }
+        }
 
         /// <summary>
         /// State of the control keys.
         /// </summary>
 
-        public ControlKeyStates ControlKeyState { get; set; }
-
+        public ControlKeyStates ControlKeyState
+        {
+            get { return controlKeyState; }
+            set { controlKeyState = value; }
+        }
 
         /// <summary>
         /// Gets and set the status of whether this instance is generated by a key pressed or released
         /// </summary>
 
-        public bool KeyDown { get; set; }
+        public bool KeyDown
+        {
+            get { return keyDown; }
+            set { keyDown = value; }
+        }
 
         /// <summary>
         ///
@@ -683,10 +685,10 @@ namespace System.Management.Automation.Host
             bool keyDown
         )
         {
-            VirtualKeyCode = virtualKeyCode;
-            Character = ch;
-            ControlKeyState = controlKeyState;
-            KeyDown = keyDown;
+            this.virtualKeyCode = virtualKeyCode;
+            this.character = ch;
+            this.controlKeyState = controlKeyState;
+            this.keyDown = keyDown;
         }
 
         /// <summary>
@@ -836,9 +838,6 @@ namespace System.Management.Automation.Host
         }
     }
 
-
-
-
     /// <summary>
     ///
     /// Represents a rectangular region of the screen.
@@ -851,14 +850,26 @@ namespace System.Management.Automation.Host
     public
     struct Rectangle
     {
+        #region DO NOT REMOVE OR RENAME THESE FIELDS - it will break remoting compatibility with Windows PowerShell
+
+        private int left;
+        private int top;
+        private int right;
+        private int bottom;
+
+        #endregion
+
         /// <summary>
         ///
         /// Gets and sets the left side of the rectangle
         ///
         /// </summary>
 
-        public int Left { get; set; }
-
+        public int Left
+        {
+            get { return left; }
+            set { left = value; }
+        }
 
         /// <summary>
         ///
@@ -866,8 +877,11 @@ namespace System.Management.Automation.Host
         ///
         /// </summary>
 
-        public int Top { get; set; }
-
+        public int Top
+        {
+            get { return top; }
+            set { top = value; }
+        }
 
         /// <summary>
         ///
@@ -875,8 +889,11 @@ namespace System.Management.Automation.Host
         ///
         /// </summary>
 
-        public int Right { get; set; }
-
+        public int Right
+        {
+            get { return right; }
+            set { right = value; }
+        }
 
         /// <summary>
         ///
@@ -884,8 +901,11 @@ namespace System.Management.Automation.Host
         ///
         /// </summary>
 
-        public int Bottom { get; set; }
-
+        public int Bottom
+        {
+            get { return bottom; }
+            set { bottom = value; }
+        }
 
         /// <summary>
         ///
@@ -933,12 +953,11 @@ namespace System.Management.Automation.Host
                 throw PSTraceSource.NewArgumentException("bottom", MshHostRawUserInterfaceStrings.LessThanErrorTemplate, "bottom", "top");
             }
 
-            Left = left;
-            Top = top;
-            Right = right;
-            Bottom = bottom;
+            this.left = left;
+            this.top = top;
+            this.right = right;
+            this.bottom = bottom;
         }
-
 
         /// <summary>
         ///
@@ -967,8 +986,6 @@ namespace System.Management.Automation.Host
             : this(upperLeft.X, upperLeft.Y, lowerRight.X, lowerRight.Y)
         {
         }
-
-
 
         /// <summary>
         ///
@@ -1150,8 +1167,6 @@ namespace System.Management.Automation.Host
         }
     }
 
-
-
     /// <summary>
     ///
     /// Represents a character, a foregroundColor color, and background color
@@ -1161,14 +1176,26 @@ namespace System.Management.Automation.Host
     public
     struct BufferCell
     {
+        #region DO NOT REMOVE OR RENAME THESE FIELDS - it will break remoting compatibility with Windows PowerShell
+
+        private char character;
+        private ConsoleColor foregroundColor;
+        private ConsoleColor backgroundColor;
+        private BufferCellType bufferCellType;
+
+        #endregion
+
         /// <summary>
         ///
         /// Gets and sets the character value
         ///
         /// </summary>
 
-        public char Character { get; set; }
-
+        public char Character
+        {
+            get { return character; }
+            set { character = value; }
+        }
 
         // we reuse System.ConsoleColor - it's in the core assembly, and I think it would be confusing to create another
         // essentially identical enum
@@ -1179,7 +1206,11 @@ namespace System.Management.Automation.Host
         ///
         /// </summary>
 
-        public ConsoleColor ForegroundColor { get; set; }
+        public ConsoleColor ForegroundColor
+        {
+            get { return foregroundColor; }
+            set { foregroundColor = value; }
+        }
 
         /// <summary>
         ///
@@ -1187,7 +1218,11 @@ namespace System.Management.Automation.Host
         ///
         /// </summary>
 
-        public ConsoleColor BackgroundColor { get; set; }
+        public ConsoleColor BackgroundColor
+        {
+            get { return backgroundColor; }
+            set { backgroundColor = value; }
+        }
 
         /// <summary>
         ///
@@ -1195,8 +1230,11 @@ namespace System.Management.Automation.Host
         ///
         /// </summary>
 
-        public BufferCellType BufferCellType { get; set; }
-
+        public BufferCellType BufferCellType
+        {
+            get { return bufferCellType; }
+            set { bufferCellType = value; }
+        }
 
         /// <summary>
         ///
@@ -1228,12 +1266,11 @@ namespace System.Management.Automation.Host
         public
         BufferCell(char character, ConsoleColor foreground, ConsoleColor background, BufferCellType bufferCellType)
         {
-            Character = character;
-            ForegroundColor = foreground;
-            BackgroundColor = background;
-            BufferCellType = bufferCellType;
+            this.character = character;
+            this.foregroundColor = foreground;
+            this.backgroundColor = background;
+            this.bufferCellType = bufferCellType;
         }
-
 
         /// <summary>
         ///
@@ -1252,7 +1289,6 @@ namespace System.Management.Automation.Host
         {
             return string.Format(CultureInfo.InvariantCulture, "'{0}' {1} {2} {3}", Character, ForegroundColor, BackgroundColor, BufferCellType);
         }
-
 
         /// <summary>
         ///
@@ -1416,9 +1452,6 @@ namespace System.Management.Automation.Host
 
     #endregion Ancillary types
 
-
-
-
     /// <summary>
     ///
     /// Defines the lowest-level user interface functions that an interactive application hosting an MSH
@@ -1452,8 +1485,6 @@ namespace System.Management.Automation.Host
             // do nothing
         }
 
-
-
         /// <summary>
         ///
         /// Gets or sets the color used to render characters on the screen buffer. Each character cell in the screen buffer can
@@ -1475,8 +1506,6 @@ namespace System.Management.Automation.Host
             set;
         }
 
-
-
         /// <summary>
         ///
         /// Gets or sets the color used to render the background behind characters on the screen buffer.  Each character cell in
@@ -1492,8 +1521,6 @@ namespace System.Management.Automation.Host
             get;
             set;
         }
-
-
 
         /// <summary>
         ///
@@ -1523,8 +1550,6 @@ namespace System.Management.Automation.Host
             set;
         }
 
-
-
         /// <summary>
         ///
         /// Gets or sets position of the view window relative to the screen buffer, in characters. (0,0) is the upper left of the screen
@@ -1544,8 +1569,6 @@ namespace System.Management.Automation.Host
             set;
         }
 
-
-
         /// <summary>
         ///
         /// Gets or sets the cursor size as a percentage 0..100.
@@ -1560,8 +1583,6 @@ namespace System.Management.Automation.Host
             get;
             set;
         }
-
-
 
         /// <summary>
         ///
@@ -1582,8 +1603,6 @@ namespace System.Management.Automation.Host
             set;
         }
 
-
-
         /// <summary>
         ///
         /// Gets or sets the current view window size, measured in character cells.  The window size cannot be larger than the
@@ -1603,8 +1622,6 @@ namespace System.Management.Automation.Host
             get;
             set;
         }
-
-
 
         /// <summary>
         ///
@@ -1636,8 +1653,6 @@ namespace System.Management.Automation.Host
             get;
         }
 
-
-
         /// <summary>
         ///
         /// Gets the largest window possible for the current font and display hardware, ignoring the current buffer dimensions.  In
@@ -1663,8 +1678,6 @@ namespace System.Management.Automation.Host
         {
             get;
         }
-
-
 
         /// <summary>
         ///
@@ -1693,8 +1706,6 @@ namespace System.Management.Automation.Host
         {
             return ReadKey(ReadKeyOptions.IncludeKeyDown);
         }
-
-
 
         /// <summary>
         ///
@@ -1734,8 +1745,6 @@ namespace System.Management.Automation.Host
         KeyInfo
         ReadKey(ReadKeyOptions options);
 
-
-
         /// <summary>
         ///
         /// Resets the keyboard input buffer.
@@ -1748,8 +1757,6 @@ namespace System.Management.Automation.Host
         public abstract
         void
         FlushInputBuffer();
-
-
 
         /// <summary>
         ///
@@ -1772,8 +1779,6 @@ namespace System.Management.Automation.Host
             get;
         }
 
-
-
         /// <summary>
         ///
         /// Gets or sets the titlebar text of the current view window.
@@ -1787,8 +1792,6 @@ namespace System.Management.Automation.Host
             get;
             set;
         }
-
-
 
         /// <summary>
         ///
@@ -1819,8 +1822,6 @@ namespace System.Management.Automation.Host
         public abstract
         void
         SetBufferContents(Coordinates origin, BufferCell[,] contents);
-
-
 
         /// <summary>
         ///
@@ -1875,8 +1876,6 @@ namespace System.Management.Automation.Host
         void
         SetBufferContents(Rectangle rectangle, BufferCell fill);
 
-
-
         /// <summary>
         ///
         /// Extracts a rectangular region of the screen buffer.
@@ -1923,8 +1922,6 @@ namespace System.Management.Automation.Host
         public abstract
         BufferCell[,]
         GetBufferContents(Rectangle rectangle);
-
-
 
         /// <summary>
         ///

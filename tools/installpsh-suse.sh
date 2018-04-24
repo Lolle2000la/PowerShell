@@ -2,8 +2,8 @@
 
 #Companion code for the blog https://cloudywindows.com
 #call this code direction from the web with:
-#bash <(wget -O - https://raw.githubusercontent.com/DarwinJS/CloudyWindowsAutomationCode/master/pshcoredevenv/pshcoredevenv-debian.sh) ARGUMENTS
-#bash <(curl -s https://raw.githubusercontent.com/PowerShell/PowerShell/master/tools/install-powershell.sh) <ARGUMENTS>
+#bash <(wget -O - https://raw.githubusercontent.com/PowerShell/PowerShell/master/tools/installpsh-suse.sh) ARGUMENTS
+#bash <(curl -s https://raw.githubusercontent.com/PowerShell/PowerShell/master/tools/installpsh-suse.sh) <ARGUMENTS>
 
 #Usage - if you do not have the ability to run scripts directly from the web, 
 #        pull all files in this repo folder and execute, this script
@@ -22,7 +22,7 @@ VERSION="1.1.2"
 gitreposubpath="PowerShell/PowerShell/master"
 gitreposcriptroot="https://raw.githubusercontent.com/$gitreposubpath/tools"
 thisinstallerdistro=suse
-repobased=true
+repobased=false
 gitscriptname="installpsh-suse.psh"
 
 echo
@@ -104,28 +104,39 @@ if [[ "$SUDO" -eq "sudo" ]]; then
 fi
 
 #Collect any variation details if required for this distro
-REV=`cat /etc/SuSE-release | grep 'VERSION' | sed s/.*=\ //`
-MAJORREV=`echo $REV | sed 's/\..*//'`
+source /etc/os-release
+MAJORREV=`echo $VERSION_ID | sed 's/\..*//'`
 #END Collect any variation details if required for this distro
 
 #If there are known incompatible versions of this distro, put the test, message and script exit here:
-if [[ $MAJORREV < 42 ]]; then
+if [[ $ID == 'opensuse' && $MAJORREV < 42 ]]; then
     echo "OpenSUSE $VERSION_ID is not supported!" >&2
+    exit 2
+fi
+if [[ $ID == 'sles' && $MAJORREV < 12 ]]; then
+    echo "SLES $VERSION_ID is not supported!" >&2
     exit 2
 fi
 
 #END Verify The Installer Choice
 
+echo
+echo "*** Installing prerequisites for PowerShell Core..."
+$SUDO zypper --non-interactive install \
+        glibc-locale \
+        glibc-i18ndata \
+        tar \
+        curl \
+        libunwind \
+        libicu \
+        openssl \
+    && zypper --non-interactive clean --all
 
 ##END Check requirements and prerequisites
 
 echo
 echo "*** Installing PowerShell Core for $DistroBasedOn..."
-if ! hash curl 2>/dev/null; then
-    echo "curl not found, installing..."
-    $SUDO zypper install -y curl
-fi
-release=`curl https://api.github.com/repos/powershell/powershell/releases/latest | sed '/tag_name/!d' | sed s/\"tag_name\"://g | sed s/\"//g | sed s/v//g | sed s/,//g | sed s/\ //g`
+release=`curl https://api.github.com/repos/powershell/powershell/releases/latest | sed '/tag_name/!d' | sed s/\"tag_name\"://g | sed s/\"//g | sed s/v// | sed s/,//g | sed s/\ //g`
 
 #REPO BASED (Not ready yet)
 #echo "*** Setting up PowerShell Core repo..."
@@ -140,8 +151,8 @@ release=`curl https://api.github.com/repos/powershell/powershell/releases/latest
 #$SUDO zypper --non-interactive install powershell
 
 #DIRECT DOWNLOAD
-packagerel=`echo $release | sed 's/-/_/'`
-package=powershell-${packagerel}-1.suse.42.1.x86_64.rpm
+pwshlink=/usr/bin/pwsh
+package=powershell-${release}-linux-x64.tar.gz
 downloadurl=https://github.com/PowerShell/PowerShell/releases/download/v$release/$package
 
 echo "Destination file: $package"
@@ -154,10 +165,30 @@ if [[ ! -r "$package" ]]; then
     exit 1
 fi
 
-sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-sudo zypper --non-interactive install "./$package"
+echo "Installing PowerShell to /opt/microsoft/powershell/$release in overwrite mode"
+## Create the target folder where powershell will be placed
+$SUDO mkdir -p /opt/microsoft/powershell/$release
+## Expand powershell to the target folder
+$SUDO tar zxf $package -C /opt/microsoft/powershell/$release
 
-powershell -noprofile -c '"Congratulations! PowerShell is installed at $PSHOME"'
+## Change the mode of 'pwsh' to 'rwxr-xr-x' to allow execution
+$SUDO chmod 755 /opt/microsoft/powershell/$release/pwsh
+## Create the symbolic link that points to powershell
+$SUDO ln -sfn /opt/microsoft/powershell/$release/pwsh $pwshlink
+
+## Add the symbolic link path to /etc/shells
+if [ ! -f /etc/shells ] ; then
+    echo $pwshlink | $SUDO tee /etc/shells ;
+else
+    grep -q "^${pwshlink}$" /etc/shells || echo $pwshlink | $SUDO tee --append /etc/shells > /dev/null ;
+fi
+
+## Remove the downloaded package file
+rm -f $package
+
+pwsh -noprofile -c '"Congratulations! PowerShell is installed at $PSHOME.
+Run `"pwsh`" to start a PowerShell session."'
+
 success=$?
 
 if [[ "$success" != 0 ]]; then
@@ -187,5 +218,7 @@ fi
 
 if [[ "$repobased" == true ]] ; then
   echo "*** NOTE: Run your regular package manager update cycle to update PowerShell Core"
+else
+  echo "*** NOTE: Re-run this script to update PowerShell Core"
 fi
 echo "*** Install Complete"

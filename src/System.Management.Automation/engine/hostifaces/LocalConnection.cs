@@ -1,6 +1,5 @@
-/********************************************************************++
- * Copyright (c) Microsoft Corporation.  All rights reserved.
- * --********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.IO;
 using System.Collections;
@@ -30,22 +29,6 @@ namespace System.Management.Automation.Runspaces
     internal sealed partial class LocalRunspace : RunspaceBase
     {
         #region constructors
-
-        /// <summary>
-        /// Construct an instance of an Runspace using a custom implementation
-        /// of PSHost.
-        /// </summary>
-        /// <param name="host">
-        /// The explicit PSHost implementation
-        /// </param>
-        /// <param name="runspaceConfig">
-        /// configuration information for this minshell.
-        /// </param>
-        [SuppressMessage("Microsoft.Maintainability", "CA1505:AvoidUnmaintainableCode")]
-        internal LocalRunspace(PSHost host, RunspaceConfiguration runspaceConfig)
-            : base(host, runspaceConfig)
-        {
-        }
 
         /// <summary>
         /// Construct an instance of an Runspace using a custom implementation
@@ -286,16 +269,6 @@ namespace System.Management.Automation.Runspaces
         #endregion protected_properties
 
         #region internal_properties
-        /// <summary>
-        /// CommandFactory object for this runspace.
-        /// </summary>
-        internal CommandFactory CommandFactory
-        {
-            get
-            {
-                return _commandFactory;
-            }
-        }
 
         /// <summary>
         /// Gets history manager for this runspace
@@ -321,7 +294,6 @@ namespace System.Management.Automation.Runspaces
             }
         }
         private TranscriptionData _transcriptionData = null;
-
 
         private JobRepository _jobRepository;
         /// <summary>
@@ -641,6 +613,7 @@ namespace System.Management.Automation.Runspaces
         /// </summary>
         private void DoOpenHelper()
         {
+            Dbg.Assert(InitialSessionState != null, "InitialSessionState should not be null");
             // NTRAID#Windows Out Of Band Releases-915851-2005/09/13
             if (_disposed)
             {
@@ -653,24 +626,16 @@ namespace System.Management.Automation.Runspaces
             {
                 _transcriptionData = new TranscriptionData();
 
-                if (InitialSessionState != null)
-                {
-                    // All ISS-based configuration of the engine itself is done by AutomationEngine,
-                    // which calls InitialSessionState.Bind(). Anything that doesn't
-                    // require an active and open runspace should be done in ISS.Bind()
-                    _engine = new AutomationEngine(Host, null, InitialSessionState);
-                }
-                else
-                {
-                    _engine = new AutomationEngine(Host, RunspaceConfiguration, null);
-                }
+                // All ISS-based configuration of the engine itself is done by AutomationEngine,
+                // which calls InitialSessionState.Bind(). Anything that doesn't
+                // require an active and open runspace should be done in ISS.Bind()
+                _engine = new AutomationEngine(Host, InitialSessionState);
                 _engine.Context.CurrentRunspace = this;
 
                 //Log engine for start of engine life
                 MshLog.LogEngineLifecycleEvent(_engine.Context, EngineState.Available);
                 startLifeCycleEventWritten = true;
 
-                _commandFactory = new CommandFactory(_engine.Context);
                 _history = new History(_engine.Context);
                 _jobRepository = new JobRepository();
                 _jobManager = new JobManager();
@@ -773,14 +738,7 @@ namespace System.Management.Automation.Runspaces
             logContext.HostVersion = Host.Version.ToString();
             logContext.RunspaceId = InstanceId.ToString();
             logContext.Severity = severity.ToString();
-            if (this.RunspaceConfiguration == null)
-            {
-                logContext.ShellId = Utils.DefaultPowerShellShellID;
-            }
-            else
-            {
-                logContext.ShellId = this.RunspaceConfiguration.ShellId;
-            }
+            logContext.ShellId = Utils.DefaultPowerShellShellID;
             MshLog.LogEngineHealthEvent(
                 logContext,
                 id,
@@ -851,41 +809,34 @@ namespace System.Management.Automation.Runspaces
         /// </remarks>
         private void DoCloseHelper()
         {
-            // Stop any transcription if we're the last runspace to exit
-            ExecutionContext executionContext = this.GetExecutionContext;
-            if (executionContext != null)
+            var isPrimaryRunspace = (Runspace.PrimaryRunspace == this);
+            var haveOpenRunspaces = false;
+            foreach (Runspace runspace in RunspaceList)
             {
-                Runspace hostRunspace = null;
-                try
+                if (runspace.RunspaceStateInfo.State == RunspaceState.Opened)
                 {
-                    hostRunspace = executionContext.EngineHostInterface.Runspace;
+                    haveOpenRunspaces = true;
+                    break;
                 }
-                catch (PSNotImplementedException)
+            }
+
+            // When closing the primary runspace, ensure all other local runspaces are closed.
+            var closeAllOpenRunspaces = isPrimaryRunspace && haveOpenRunspaces;
+
+            // Stop all transcriptions and unitialize AMSI if we're the last runspace to exit or we are exiting the primary runspace.
+            if (!haveOpenRunspaces)
+            {
+                ExecutionContext executionContext = this.GetExecutionContext;
+                if (executionContext != null)
                 {
-                    // EngineHostInterface.Runspace throws PSNotImplementedException if there
-                    // is no interactive host.
+                    PSHostUserInterface hostUI = executionContext.EngineHostInterface.UI;
+                    if (hostUI != null)
+                    {
+                        hostUI.StopAllTranscribing();
+                    }
                 }
 
-                if ((hostRunspace == null) || (this == hostRunspace))
-                {                   
-                    // We should close transcripting only if we are closing the last opened runspace.
-                    foreach (Runspace runspace in RunspaceList)
-                    {
-                        // At this stage, the last opened runspace should be at closing state.
-                        if (runspace.RunspaceStateInfo.State == RunspaceState.Opened)
-                        {
-                            return;
-                        }
-                    }
-
-                    PSHostUserInterface host = executionContext.EngineHostInterface.UI;
-                    if (host != null)
-                    {
-                        host.StopAllTranscribing();
-                    }
-
-                    AmsiUtils.Uninitialize();
-                }
+                AmsiUtils.Uninitialize();
             }
 
             // Generate the shutdown event
@@ -893,7 +844,6 @@ namespace System.Management.Automation.Runspaces
                 Events.GenerateEvent(PSEngineEvent.Exiting, null, new object[] { }, null, true, false);
 
             //Stop all running pipelines
-
             //Note:Do not perform the Cancel in lock. Reason is
             //Pipeline executes in separate thread, say threadP.
             //When pipeline is canceled/failed/completed in
@@ -929,18 +879,27 @@ namespace System.Management.Automation.Runspaces
 
             //Log engine lifecycle event.
             MshLog.LogEngineLifecycleEvent(_engine.Context, EngineState.Stopped);
-  
+
             //All pipelines have been canceled. Close the runspace.
             _engine = null;
-            _commandFactory = null;
 
             SetRunspaceState(RunspaceState.Closed);
 
             //Raise Event
             RaiseRunspaceStateEvents();
 
-            // Report telemetry if we have no more open runspaces.
+            if (closeAllOpenRunspaces)
+            {
+                foreach (Runspace runspace in RunspaceList)
+                {
+                    if (runspace.RunspaceStateInfo.State == RunspaceState.Opened)
+                    {
+                        runspace.Dispose();
+                    }
+                }
+            }
 
+            // Report telemetry if we have no more open runspaces.
 #if LEGACYTELEMETRY
             bool allRunspacesClosed = true;
             bool hostProvidesExitTelemetry = false;
@@ -1229,7 +1188,6 @@ namespace System.Management.Automation.Runspaces
             }
         }
 
-
         #endregion SessionStateProxy
 
         #region IDisposable Members
@@ -1319,11 +1277,6 @@ namespace System.Management.Automation.Runspaces
         #endregion IDisposable Members
 
         #region private fields
-
-        /// <summary>
-        /// CommandFactory for creating Command objects
-        /// </summary>
-        private CommandFactory _commandFactory;
 
         /// <summary>
         /// AutomationEngine instance for this runspace
@@ -1613,7 +1566,6 @@ namespace System.Management.Automation.Runspaces
         {
         }
 
-
         /// <summary>
         /// Populates a <see cref="SerializationInfo"/> with the
         /// data needed to serialize the RunspaceOpenModuleLoadException object.
@@ -1635,7 +1587,4 @@ namespace System.Management.Automation.Runspaces
 
     #endregion Helper Class
 }
-
-
-
 

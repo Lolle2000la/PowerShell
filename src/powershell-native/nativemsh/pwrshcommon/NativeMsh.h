@@ -1,7 +1,7 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 // ----------------------------------------------------------------------
-//
-//  Microsoft Windows NT
-//  Copyright (C) Microsoft Corporation, 2005.
 //
 //  File:      NativeMsh.h
 //
@@ -24,7 +24,7 @@
 #include <mscoree.h>
 #endif
 
-namespace NativeMsh 
+namespace NativeMsh
 {
     class PwrshCommon
     {
@@ -35,7 +35,7 @@ namespace NativeMsh
 
     public:
         // Provides default implementations of all dependencies
-        PwrshCommon(); 
+        PwrshCommon();
 
         // Allows users to override the default dependency objects with a specific implementations.
         //
@@ -78,25 +78,27 @@ namespace NativeMsh
         // Note: During successful calls the following values must be freed by the caller:
         //      pwszMonadVersion
         //      pwszRuntimeVersion
-        //      pwzsRegKeyValue
+        //      pwszRegKeyValue
         //
         // The caller must take care to check to see if they must be freed during error scenarios
         // because the function may fail after allocating one or more strings.
         //
+        _Success_(return == 0)
         unsigned int GetRegistryInfo(
-            __deref_out_opt PWSTR * pwszMonadVersion,
+            __out PWSTR * pwszMonadVersion,
             __inout_ecount(1) int * lpMonadMajorVersion,
             int monadMinorVersion,
-            __deref_out_opt PWSTR * pwszRuntimeVersion,
+            __out PWSTR * pwszRuntimeVersion,
             LPCWSTR lpszRegKeyNameToRead,
-            __deref_out_opt PWSTR * pwzsRegKeyValue);
+            __out PWSTR * pwszRegKeyValue);
 
+        _Success_(return == 0)
         unsigned int GetRegistryInfo(
-            __deref_out_opt PWSTR * pwszMonadVersion,
+            __out PWSTR * pwszMonadVersion,
             __inout_ecount(1) int * lpMonadMajorVersion,
             int monadMinorVersion,
-            __deref_out_opt PWSTR * pwszRuntimeVersion,
-            __deref_out_opt PWSTR * pwszConsoleHostAssemblyName);
+            __out PWSTR * pwszRuntimeVersion,
+            __out PWSTR * pwszConsoleHostAssemblyName);
 
         unsigned int LaunchCoreCLR(
             ClrHostWrapper* hostWrapper,

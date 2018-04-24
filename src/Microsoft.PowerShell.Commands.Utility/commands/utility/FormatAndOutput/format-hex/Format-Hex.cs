@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 using System;
 using System.IO;
 using System.Text;
@@ -46,14 +49,20 @@ namespace Microsoft.PowerShell.Commands
         /// Type of character encoding for InputObject
         /// </summary>
         [Parameter(ParameterSetName = "ByInputObject")]
-        [ValidateSetAttribute(new string[] {
-            EncodingConversion.Unicode,
+        [ArgumentToEncodingTransformationAttribute()]
+        [ArgumentCompletions(
+            EncodingConversion.Ascii,
             EncodingConversion.BigEndianUnicode,
-            EncodingConversion.Utf8,
+            EncodingConversion.OEM,
+            EncodingConversion.Unicode,
             EncodingConversion.Utf7,
-            EncodingConversion.Utf32,
-            EncodingConversion.Ascii})]
-        public string Encoding { get; set; } = "Ascii";
+            EncodingConversion.Utf8,
+            EncodingConversion.Utf8Bom,
+            EncodingConversion.Utf8NoBom,
+            EncodingConversion.Utf32
+            )]
+        [ValidateNotNullOrEmpty]
+        public Encoding Encoding { get; set; } = ClrFacade.GetDefaultEncoding();
 
         /// <summary>
         /// This parameter is no-op
@@ -76,9 +85,9 @@ namespace Microsoft.PowerShell.Commands
             }
             else
             {
-                List<string> pathsToProcess = String.Equals(this.ParameterSetName, "LiteralPath", StringComparison.OrdinalIgnoreCase) ? 
+                List<string> pathsToProcess = String.Equals(this.ParameterSetName, "LiteralPath", StringComparison.OrdinalIgnoreCase) ?
                                               ResolvePaths(LiteralPath, true) : ResolvePaths(Path, false);
-                
+
                 ProcessPath(pathsToProcess);
             }
         }
@@ -235,19 +244,18 @@ namespace Microsoft.PowerShell.Commands
                 List<string> pathsToProcess = ResolvePaths(path, true);
                 ProcessPath(pathsToProcess);
             }
-            
+
             else if (obj is string)
             {
                 string inputString = obj.ToString();
-                Encoding resolvedEncoding = EncodingConversion.Convert(this, Encoding);
-                inputBytes = resolvedEncoding.GetBytes(inputString);
+                inputBytes = Encoding.GetBytes(inputString);
             }
-            
+
             else if (obj is byte)
             {
                 inputBytes = new byte[] { (byte)obj };
             }
-            
+
             else if (obj is byte[])
             {
                 inputBytes = ((byte[])obj);
@@ -274,7 +282,7 @@ namespace Microsoft.PowerShell.Commands
             {
                 inputBytes = BitConverter.GetBytes((Int64)obj);
             }
-            
+
             else if (obj is Int64[])
             {
                 List<byte> inputStreamArray = new List<byte>();

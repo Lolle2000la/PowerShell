@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 #pragma warning disable 1634, 1691
 #pragma warning disable 56523
@@ -10,7 +9,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Microsoft.PowerShell;
 using Microsoft.PowerShell.Commands;
-using Microsoft.Win32;
+using System.Management.Automation.Security;
+using System.Management.Automation.Configuration;
 using System.Management.Automation.Internal;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -141,7 +141,6 @@ namespace System.Management.Automation.Internal
             throw new PlatformNotSupportedException();
 #else
             string executionPolicy = "Restricted";
-            string preferenceKey = Utils.GetRegistryConfigurationPath(shellId);
 
             switch (policy)
             {
@@ -174,12 +173,11 @@ namespace System.Management.Automation.Internal
                     // They want to remove it
                     if (policy == ExecutionPolicy.Undefined)
                     {
-                        ConfigPropertyAccessor.Instance.RemoveExecutionPolicy(ConfigPropertyAccessor.PropertyScope.CurrentUser, shellId);
-                        CleanKeyParents(Registry.CurrentUser, preferenceKey);
+                        PowerShellConfig.Instance.RemoveExecutionPolicy(ConfigScope.CurrentUser, shellId);
                     }
                     else
                     {
-                        ConfigPropertyAccessor.Instance.SetExecutionPolicy(ConfigPropertyAccessor.PropertyScope.CurrentUser, shellId, executionPolicy);
+                        PowerShellConfig.Instance.SetExecutionPolicy(ConfigScope.CurrentUser, shellId, executionPolicy);
                     }
                     break;
                 }
@@ -189,61 +187,16 @@ namespace System.Management.Automation.Internal
                     // They want to remove it
                     if (policy == ExecutionPolicy.Undefined)
                     {
-                        ConfigPropertyAccessor.Instance.RemoveExecutionPolicy(ConfigPropertyAccessor.PropertyScope.SystemWide, shellId);
-                        CleanKeyParents(Registry.LocalMachine, preferenceKey);
+                        PowerShellConfig.Instance.RemoveExecutionPolicy(ConfigScope.SystemWide, shellId);
                     }
                     else
                     {
-                        ConfigPropertyAccessor.Instance.SetExecutionPolicy(ConfigPropertyAccessor.PropertyScope.SystemWide, shellId, executionPolicy);
+                        PowerShellConfig.Instance.SetExecutionPolicy(ConfigScope.SystemWide, shellId, executionPolicy);
                     }
                     break;
                 }
             }
 #endif
-        }
-
-        // Clean up the parents of a registry key as long as they
-        // contain at most a single child
-        private static void CleanKeyParents(RegistryKey baseKey, string keyPath)
-        {
-#if CORECLR
-            if (!Platform.IsInbox)
-                return;
-#endif
-            using (RegistryKey key = baseKey.OpenSubKey(keyPath, true))
-            {
-                // Verify the child key has no children
-                if ((key == null) || ((key.ValueCount == 0) && (key.SubKeyCount == 0)))
-                {
-                    // If so, split the key into its path elements
-                    string[] parentKeys = keyPath.Split(Utils.Separators.Backslash);
-
-                    // Verify we aren't traveling into SOFTWARE\Microsoft
-                    if (parentKeys.Length <= 2)
-                        return;
-
-                    string currentItem = parentKeys[parentKeys.Length - 1];
-
-                    // Figure out the parent key name
-                    string parentKeyPath = keyPath.Remove(keyPath.Length - currentItem.Length - 1);
-
-                    // Open the parent, and clear the child key
-                    if (key != null)
-                    {
-                        using (RegistryKey parentKey = baseKey.OpenSubKey(parentKeyPath, true))
-                        {
-                            parentKey.DeleteSubKey(currentItem, true);
-                        }
-                    }
-
-                    // Now, process the parent key
-                    CleanKeyParents(baseKey, parentKeyPath);
-                }
-                else
-                {
-                    return;
-                }
-            }
         }
 
         internal static ExecutionPolicy GetExecutionPolicy(string shellId)
@@ -258,7 +211,6 @@ namespace System.Management.Automation.Internal
             return ExecutionPolicy.Restricted;
         }
 
-
         private static bool? _hasGpScriptParent;
 
         /// <summary>
@@ -266,7 +218,7 @@ namespace System.Management.Automation.Internal
         /// Used to determine execution policy when group policies are in effect
         /// </summary>
         /// <remarks>
-        /// This is somewhat expensive to determine and does not change within the lifetime of the current process		
+        /// This is somewhat expensive to determine and does not change within the lifetime of the current process
         /// </remarks>
         private static bool HasGpScriptParent
         {
@@ -358,12 +310,12 @@ namespace System.Management.Automation.Internal
 
                         // Be sure we aren't being called by Group Policy
                         // itself. A group policy should never block a logon /
-                        // logoff script.     
+                        // logoff script.
                         if (String.IsNullOrEmpty(groupPolicyPreference) || HasGpScriptParent)
                         {
                             return ExecutionPolicy.Undefined;
-                        }                                                                                                                                               
-                        return ParseExecutionPolicy(groupPolicyPreference);                                                
+                        }
+                        return ParseExecutionPolicy(groupPolicyPreference);
                     }
             }
 
@@ -464,7 +416,67 @@ namespace System.Management.Automation.Internal
 #endif
         }
 
-#if !CORECLR
+        /// <summary>
+        /// Returns the value of the Execution Policy as retrieved
+        /// from group policy.
+        /// </summary>
+        /// <returns>NULL if it is not defined at this level</returns>
+        private static string GetGroupPolicyValue(string shellId, ExecutionPolicyScope scope)
+        {
+            ConfigScope[] scopeKey = null;
+
+            switch (scope)
+            {
+                case ExecutionPolicyScope.MachinePolicy:
+                    scopeKey = Utils.SystemWideOnlyConfig;
+                    break;
+
+                case ExecutionPolicyScope.UserPolicy:
+                    scopeKey = Utils.CurrentUserOnlyConfig;
+                    break;
+            }
+
+            var scriptExecutionSetting = Utils.GetPolicySetting<ScriptExecution>(scopeKey);
+            if (scriptExecutionSetting != null)
+            {
+                if (scriptExecutionSetting.EnableScripts == false)
+                {
+                    // Script execution is explicitly disabled
+                    return "Restricted";
+                }
+                else if (scriptExecutionSetting.EnableScripts == true)
+                {
+                    // Script execution is explicitly enabled
+                    return scriptExecutionSetting.ExecutionPolicy;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Returns the value of the Execution Policy as retrieved
+        /// from the local preference.
+        /// </summary>
+        /// <returns>NULL if it is not defined at this level</returns>
+        private static string GetLocalPreferenceValue(string shellId, ExecutionPolicyScope scope)
+        {
+            switch (scope)
+            {
+                // 1: Look up the current-user preference
+                case ExecutionPolicyScope.CurrentUser:
+                    return PowerShellConfig.Instance.GetExecutionPolicy(ConfigScope.CurrentUser, shellId);
+
+                // 2: Look up the system-wide preference
+                case ExecutionPolicyScope.LocalMachine:
+                    return PowerShellConfig.Instance.GetExecutionPolicy(ConfigScope.SystemWide, shellId);
+            }
+
+            return null;
+        }
+
+#endregion execution policy
+
         /// <summary>
         /// Get the pass / fail result of calling the SAFER API
         /// </summary>
@@ -548,77 +560,6 @@ namespace System.Management.Automation.Internal
 
             return status;
         }
-#endif
-        /// <summary>
-        /// Returns the value of the Execution Policy as retrieved
-        /// from group policy.
-        /// </summary>
-        /// <returns>NULL if it is not defined at this level</returns>
-        private static string GetGroupPolicyValue(string shellId, ExecutionPolicyScope scope)
-        {
-            RegistryKey[] scopeKey = null;
-
-            switch (scope)
-            {
-                case ExecutionPolicyScope.MachinePolicy:
-                    {
-                        scopeKey = Utils.RegLocalMachine;
-                    }; break;
-
-                case ExecutionPolicyScope.UserPolicy:
-                    {
-                        scopeKey = Utils.RegCurrentUser;
-                    }; break;
-            }
-
-            Dictionary<string, object> groupPolicySettings = Utils.GetGroupPolicySetting(".", scopeKey);
-            if (groupPolicySettings == null)
-            {
-                return null;
-            }
-
-            Object enableScriptsValue = null;
-            if (groupPolicySettings.TryGetValue("EnableScripts", out enableScriptsValue))
-            {
-                if (String.Equals(enableScriptsValue.ToString(), "0", StringComparison.OrdinalIgnoreCase))
-                {
-                    return "Restricted";
-                }
-                else if (String.Equals(enableScriptsValue.ToString(), "1", StringComparison.OrdinalIgnoreCase))
-                {
-                    Object executionPolicyValue = null;
-                    if (groupPolicySettings.TryGetValue("ExecutionPolicy", out executionPolicyValue))
-                    {
-                        return executionPolicyValue.ToString();
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Returns the value of the Execution Policy as retrieved
-        /// from the local preference.
-        /// </summary>
-        /// <returns>NULL if it is not defined at this level</returns>
-        private static string GetLocalPreferenceValue(string shellId, ExecutionPolicyScope scope)
-        {
-            switch (scope)
-            {
-                // 1: Look up the current-user preference
-                case ExecutionPolicyScope.CurrentUser:
-                    return ConfigPropertyAccessor.Instance.GetExecutionPolicy(ConfigPropertyAccessor.PropertyScope.CurrentUser, shellId);
-
-                // 2: Look up the system-wide preference
-                case ExecutionPolicyScope.LocalMachine:
-                    return ConfigPropertyAccessor.Instance.GetExecutionPolicy(ConfigPropertyAccessor.PropertyScope.SystemWide, shellId);
-            }
-
-            return null;
-        }
-
-#endregion execution policy
 
         /// <summary>
         /// throw if file does not exist
@@ -1027,7 +968,6 @@ namespace Microsoft.PowerShell.Commands
         All = 0xffff
     }
 }
-
 
 namespace System.Management.Automation
 {
@@ -1513,7 +1453,6 @@ namespace System.Management.Automation
                     processedThumbprints.Add(certificate.Thumbprint);
                 }
 
-
                 if (purpose == ResolutionPurpose.Encryption)
                 {
                     // Only let wildcards expand to one recipient. Otherwise, data
@@ -1576,9 +1515,7 @@ namespace System.Management.Automation
                     hostname = string.Concat("PowerShell_", processPath, ".exe_0.0.0.0");
                 }
 
-#if !CORECLR
                 AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
-#endif
 
                 var hr = AmsiNativeMethods.AmsiInitialize(hostname, ref s_amsiContext);
                 if (!Utils.Succeeded(hr))
@@ -1795,12 +1732,10 @@ namespace System.Management.Automation
             internal static extern int AmsiInitialize(
                 [InAttribute()] [MarshalAsAttribute(UnmanagedType.LPWStr)] string appName, ref System.IntPtr amsiContext);
 
-
             /// Return Type: void
             ///amsiContext: HAMSICONTEXT->HAMSICONTEXT__*
             [DllImportAttribute("amsi.dll", EntryPoint = "AmsiUninitialize", CallingConvention = CallingConvention.StdCall)]
             internal static extern void AmsiUninitialize(System.IntPtr amsiContext);
-
 
             /// Return Type: HRESULT->LONG->int
             ///amsiContext: HAMSICONTEXT->HAMSICONTEXT__*
@@ -1808,13 +1743,11 @@ namespace System.Management.Automation
             [DllImportAttribute("amsi.dll", EntryPoint = "AmsiOpenSession", CallingConvention = CallingConvention.StdCall)]
             internal static extern int AmsiOpenSession(System.IntPtr amsiContext, ref System.IntPtr amsiSession);
 
-
             /// Return Type: void
             ///amsiContext: HAMSICONTEXT->HAMSICONTEXT__*
             ///amsiSession: HAMSISESSION->HAMSISESSION__*
             [DllImportAttribute("amsi.dll", EntryPoint = "AmsiCloseSession", CallingConvention = CallingConvention.StdCall)]
             internal static extern void AmsiCloseSession(System.IntPtr amsiContext, System.IntPtr amsiSession);
-
 
             /// Return Type: HRESULT->LONG->int
             ///amsiContext: HAMSICONTEXT->HAMSICONTEXT__*
@@ -1827,7 +1760,6 @@ namespace System.Management.Automation
             internal static extern int AmsiScanBuffer(
                 System.IntPtr amsiContext, System.IntPtr buffer, uint length,
                 [InAttribute()] [MarshalAsAttribute(UnmanagedType.LPWStr)] string contentName, System.IntPtr amsiSession, ref AMSI_RESULT result);
-
 
             /// Return Type: HRESULT->LONG->int
             ///amsiContext: HAMSICONTEXT->HAMSICONTEXT__*

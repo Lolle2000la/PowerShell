@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 using System.IO;
@@ -24,7 +23,7 @@ namespace Microsoft.PowerShell
 
     /// <summary>
     ///
-    /// ConsoleHostUserInterface implements console-mode user interface for powershell.exe
+    /// ConsoleHostUserInterface implements console-mode user interface for powershell
     ///
     /// </summary>
     [SuppressMessage("Microsoft.Maintainability", "CA1506:AvoidExcessiveClassCoupling")]
@@ -128,7 +127,6 @@ namespace Microsoft.PowerShell
         //    }
         //}
 
-
         /// <summary>
         ///
         /// true if command completion is currently running
@@ -189,7 +187,6 @@ namespace Microsoft.PowerShell
 
             return ReadLine(false, "", out unused, true, true);
         }
-
 
         /// <summary>
         ///
@@ -452,7 +449,6 @@ namespace Microsoft.PowerShell
             }
         }
 
-
         /// <summary>
         ///
         /// Handle writing print token with proper cursor adjustment for ReadLineSafe
@@ -500,8 +496,6 @@ namespace Microsoft.PowerShell
             WriteToConsole(printToken, false);
         }
 
-
-
         /// <summary>
         ///
         /// Handle backspace with proper cursor adjustment for ReadLineSafe
@@ -548,8 +542,6 @@ namespace Microsoft.PowerShell
             // do nothing if cursorPosition.X is left of screen
         }
 
-
-
         /// <summary>
         /// Blank out at and move rawui.CursorPosition to <paramref name="cursorPosition"/>
         /// </summary>
@@ -560,7 +552,6 @@ namespace Microsoft.PowerShell
             WriteToConsole(" ", true);
             _rawui.CursorPosition = cursorPosition;
         }
-
 
 #if !UNIX
         /// <summary>
@@ -643,8 +634,6 @@ namespace Microsoft.PowerShell
             }
         }
 
-
-
         private void WriteToConsole(ConsoleColor foregroundColor, ConsoleColor backgroundColor, string text)
         {
             ConsoleColor fg = RawUI.ForegroundColor;
@@ -670,16 +659,12 @@ namespace Microsoft.PowerShell
             WriteToConsole(Crlf, true);
         }
 
-
-
         private void WriteLineToConsole()
         {
             WriteToConsole(Crlf, true);
         }
 
         #endregion WriteToConsole
-
-
 
         /// <summary>
         ///
@@ -724,8 +709,6 @@ namespace Microsoft.PowerShell
                 writer.Write(value);
             }
         }
-
-
 
         /// <summary>
         ///
@@ -775,8 +758,6 @@ namespace Microsoft.PowerShell
             }
         }
 
-
-
         /// <summary>
         ///
         /// See base class
@@ -807,8 +788,6 @@ namespace Microsoft.PowerShell
         }
 
         #region Word Wrapping
-
-
 
         /// <summary>
         ///
@@ -928,14 +907,11 @@ namespace Microsoft.PowerShell
             return result;
         }
 
-
-
         /// <summary>
         ///
         /// Struct used by WrapText
         ///
         /// </summary>
-
 
         [Flags]
         internal enum WordFlags
@@ -950,8 +926,6 @@ namespace Microsoft.PowerShell
             internal string Text;
             internal WordFlags Flags;
         }
-
-
 
         /// <summary>
         ///
@@ -1066,8 +1040,6 @@ namespace Microsoft.PowerShell
             return result;
         }
 
-
-
         /// <summary>
         ///
         /// Helper for ChopTextIntoWords.  Takes a span of characters in a string and adds it to the word list, further
@@ -1148,44 +1120,6 @@ namespace Microsoft.PowerShell
             }
         }
 
-        /// <summary>
-        ///
-        /// Writes text, wrapping a "word" boundaries when needed.
-        ///
-        /// </summary>
-        /// <param name="fg">
-        ///
-        /// Foreground color to output the text.
-        ///
-        /// </param>
-        /// <param name="bg">
-        ///
-        /// Background color to output the text.
-        ///
-        /// </param>
-        /// <param name="text">
-        ///
-        /// Text to be emitted.
-        ///
-        /// </param>
-
-        internal void WriteWrappedLine(ConsoleColor fg, ConsoleColor bg, string text)
-        {
-            WriteLine(fg, bg, WrapToCurrentWindowWidth(text));
-        }
-
-
-
-        // unused for now.
-        //internal
-        //void
-        //WriteWrappedLine(string text)
-        //{
-        //    WriteWrappedLine(RawUI.ForegroundColor, RawUI.BackgroundColor, text);
-        //}
-
-
-
         internal string WrapToCurrentWindowWidth(string text)
         {
             StringBuilder sb = new StringBuilder();
@@ -1207,11 +1141,7 @@ namespace Microsoft.PowerShell
             return sb.ToString();
         }
 
-
-
-        #endregion Word Wrapping
-
-
+#endregion Word Wrapping
 
         /// <summary>
         ///
@@ -1248,7 +1178,7 @@ namespace Microsoft.PowerShell
             else
             {
                 // NTRAID#Windows OS Bugs-1061752-2004/12/15-sburns should read a skin setting here...
-                WriteWrappedLine(
+                WriteLine(
                     DebugForegroundColor,
                     DebugBackgroundColor,
                     StringUtil.Format(ConsoleHostUserInterfaceStrings.DebugFormatString, message));
@@ -1309,13 +1239,12 @@ namespace Microsoft.PowerShell
             }
             else
             {
-                WriteWrappedLine(
+                WriteLine(
                     VerboseForegroundColor,
                     VerboseBackgroundColor,
                     StringUtil.Format(ConsoleHostUserInterfaceStrings.VerboseFormatString, message));
             }
         }
-
 
         /// <summary>
         ///
@@ -1352,7 +1281,7 @@ namespace Microsoft.PowerShell
             }
             else
             {
-                WriteWrappedLine(
+                WriteLine(
                     WarningForegroundColor,
                     WarningBackgroundColor,
                     StringUtil.Format(ConsoleHostUserInterfaceStrings.WarningFormatString, message));
@@ -1397,8 +1326,6 @@ namespace Microsoft.PowerShell
                 }
             }
         }
-
-
 
         public override void WriteErrorLine(string value)
         {
@@ -1450,10 +1377,7 @@ namespace Microsoft.PowerShell
 
         #endregion Line-oriented interaction
 
-
         #region implementation
-
-
 
         // We use System.Environment.NewLine because we are platform-agnostic
 
@@ -1928,7 +1852,6 @@ namespace Microsoft.PowerShell
         }
 #endif
 
-
         /// <summary>
         /// Strip nulls from a string...
         /// </summary>
@@ -1946,7 +1869,6 @@ namespace Microsoft.PowerShell
             }
             return sb.ToString();
         }
-
 
         /// <summary>
         ///

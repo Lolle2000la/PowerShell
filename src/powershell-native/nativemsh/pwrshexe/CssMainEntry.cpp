@@ -1,7 +1,7 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 // ----------------------------------------------------------------------
-//
-//  Microsoft Windows NT
-//  Copyright (C) Microsoft Corporation, 2005.
 //
 //  File:      CoreCLRHost.cpp
 //
@@ -9,8 +9,8 @@
 //
 // ----------------------------------------------------------------------
 
-#include <windows.h>  
-#include <string>  
+#include <windows.h>
+#include <string>
 #include <stdio.h>
 #if !CORECLR
   #include "mscoree.h"
@@ -217,7 +217,7 @@ int __cdecl wmain(const int argc, const wchar_t* argv[])
     if (debug)
     {
         ::wprintf(L"  Attach the debugger to powershell.exe and press any key to continue\n");
-        ::getchar();
+        (void) ::getchar();
     }
 
     if (helpRequested)

@@ -1,17 +1,31 @@
-[cmdletbinding()]
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+[cmdletbinding(DefaultParameterSetName='default')]
 # PowerShell Script to clone, build and package PowerShell from specified fork and branch
 param (
     [string] $fork = 'powershell',
+
     [string] $branch = 'master',
+
     [string] $location = "$pwd\powershell",
+
     [string] $destination = "$env:WORKSPACE",
-    [ValidateSet("win7-x64", "win81-x64", "win10-x64", "win7-x86")]    
-    [string]$Runtime = 'win10-x64',
+
+    [ValidateSet("win7-x64", "win7-x86", "win-arm", "win-arm64")]
+    [string]$Runtime = 'win7-x64',
+
     [switch] $Wait,
-    [ValidatePattern("^v\d+\.\d+\.\d+(-\w+\.\d+)?$")]
+
+    [ValidatePattern("^v\d+\.\d+\.\d+(-\w+(\.\d+)?)?$")]
     [ValidateNotNullOrEmpty()]
     [string]$ReleaseTag,
-    [switch] $Symbols
+
+    [Parameter(Mandatory,ParameterSetName='IncludeSymbols')]
+    [switch] $Symbols,
+
+    [Parameter(Mandatory,ParameterSetName='packageSigned')]
+    [ValidatePattern("-signed.zip$")]
+    [string]$BuildZip
 )
 
 $releaseTagParam = @{}
@@ -52,42 +66,47 @@ try{
     Import-Module "$location\build.psm1" -Force
     Import-Module "$location\tools\packaging" -Force
     $env:platform = $null
+
+    Write-Verbose "Sync'ing Tags..." -verbose
+    Sync-PSTags -AddRemoteIfMissing
+
     Write-Verbose "Bootstrapping powershell build..." -verbose
     Start-PSBootstrap -Force -Package
 
-    Write-Verbose "Starting powershell build for RID: $Runtime and ReleaseTag: $ReleaseTag ..." -verbose
-    $buildParams = @{}
-    if(!$Symbols.IsPresent)
+    if($PSCmdlet.ParameterSetName -eq 'packageSigned')
     {
-        $buildParams['CrossGen'] = $true
+        Write-Verbose "Expanding signed build..." -verbose
+        Expand-PSSignedBuild -BuildZip $BuildZip
+        Remove-Item -Path $BuildZip
+    }
+    else
+    {
+        Write-Verbose "Starting powershell build for RID: $Runtime and ReleaseTag: $ReleaseTag ..." -verbose
+        $buildParams = @{'CrossGen'= $Runtime -notmatch "arm"}
+        if(!$Symbols.IsPresent)
+        {
+            $buildParams['PSModuleRestore'] = $true
+        }
+
+        Start-PSBuild -Clean -Runtime $Runtime -Configuration Release @releaseTagParam @buildParams
     }
 
-    Start-PSBuild -Clean -PSModuleRestore -Runtime $Runtime -Configuration Release @releaseTagParam @buildParams
-
-    $pspackageParams = @{'Type'='msi'}
-    if ($Runtime -ne 'win10-x64')
-    {
-        $pspackageParams += @{'WindowsRuntime'=$Runtime}
-    }
-
-    if(!$Symbols.IsPresent)
+    $pspackageParams = @{'Type'='msi'; 'WindowsRuntime'=$Runtime}
+    if(!$Symbols.IsPresent -and $Runtime -notmatch "arm")
     {
         Write-Verbose "Starting powershell packaging(msi)..." -verbose
         Start-PSPackage @pspackageParams @releaseTagParam
     }
-    else 
-    {
-        $pspackageParams += @{'IncludeSymbols' = $true}
-    }
 
     $pspackageParams['Type']='zip'
+    $pspackageParams['IncludeSymbols']=$Symbols.IsPresent
     Write-Verbose "Starting powershell packaging(zip)..." -verbose
     Start-PSPackage @pspackageParams @releaseTagParam
 
     Write-Verbose "Exporting packages ..." -verbose
 
-    Get-ChildItem $location\*.msi,$location\*.zip | Select-Object -ExpandProperty FullName | ForEach-Object {
-        $file = $_
+    Get-ChildItem $location\*.msi,$location\*.zip,$location\*.wixpdb | ForEach-Object {
+        $file = $_.FullName
         Write-Verbose "Copying $file to $destination" -verbose
         Copy-Item -Path $file -Destination "$destination\" -Force
     }

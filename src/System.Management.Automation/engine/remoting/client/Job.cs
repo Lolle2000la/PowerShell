@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -258,7 +257,6 @@ namespace System.Management.Automation
             State = jobStateInfo.State;
             Reason = jobStateInfo.Reason;
         }
-
 
         #endregion constructors
 
@@ -1542,14 +1540,25 @@ namespace System.Management.Automation
         /// </summary>
         internal void CloseAllStreams()
         {
-            if (_resultsOwner) _results.Complete();
-            if (_outputOwner) _output.Complete();
-            if (_errorOwner) _error.Complete();
-            if (_progressOwner) _progress.Complete();
-            if (_verboseOwner) _verbose.Complete();
-            if (_warningOwner) _warning.Complete();
-            if (_debugOwner) _debug.Complete();
-            if (_informationOwner) _information.Complete();
+            // The Complete() method includes raising public notification events that third parties can
+            // handle and potentially throw exceptions on the notification thread.  We don't want to 
+            // propagate those exceptions because it prevents this thread from completing its processing.
+            if (_resultsOwner) { try { _results.Complete(); } catch (Exception e) { TraceException(e); } }
+            if (_outputOwner) { try { _output.Complete(); } catch (Exception e) { TraceException(e); } }
+            if (_errorOwner) { try { _error.Complete(); } catch (Exception e) { TraceException(e); } }
+            if (_progressOwner) { try { _progress.Complete(); } catch (Exception e) { TraceException(e); } }
+            if (_verboseOwner) { try { _verbose.Complete(); } catch (Exception e) { TraceException(e); } }
+            if (_warningOwner) { try { _warning.Complete(); } catch (Exception e) { TraceException(e); } }
+            if (_debugOwner) { try { _debug.Complete(); } catch (Exception e) { TraceException(e); } }
+            if (_informationOwner) { try { _information.Complete(); } catch (Exception e) { TraceException(e); } }
+        }
+
+        private static void TraceException(Exception e)
+        {
+            using (PowerShellTraceSource tracer = PowerShellTraceSourceFactory.GetTraceSource())
+            {
+                tracer.TraceException(e);
+            }
         }
 
         /// <summary>
@@ -1718,7 +1727,6 @@ namespace System.Management.Automation
             :
             this(remoteRunspaceInfos, runspaceHelpers, remoteCommand, 0, name)
         { }
-
 
         /// <summary>
         /// Internal constructor for initializing PSRemotingJob using
@@ -2181,7 +2189,6 @@ namespace System.Management.Automation
                 return _moreData;
             }
         }
-
 
         private bool _stopIsCalled = false;
         /// <summary>

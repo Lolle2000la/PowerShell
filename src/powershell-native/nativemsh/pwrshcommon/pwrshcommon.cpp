@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 //
 // Implementation of common code used by native PowerShell
@@ -13,7 +12,7 @@ Copyright (c) Microsoft Corporation.  All rights reserved.
 #include <sstream>
 #include "WinSystemCallFacade.h"
 
-namespace NativeMsh 
+namespace NativeMsh
 {
     //
     // Defining these as "static" ensures internal linkage of the values.
@@ -60,7 +59,7 @@ namespace NativeMsh
             // this should never cause overflow because VerifyInteger guarantees pwchMinorVersion
             // has less than g_MAX_NUMBER_OF_DIGITS_IN_VERSION which is 10.
             unsigned long ulTempResult = wcstoul(pwchStart, &pwchIntEnd, 10);
-            // Make sure the whole string is an integer and fits an int 
+            // Make sure the whole string is an integer and fits an int
             if (pwchEnd != pwchIntEnd || ulTempResult > (unsigned long)INT_MAX)
             {
                 returnResult = false;
@@ -486,7 +485,7 @@ namespace NativeMsh
     }
 
     unsigned int PwrshCommon::IsEngineRegKeyWithVersionExisting(
-        LPCWSTR wszMonadVersion, 
+        LPCWSTR wszMonadVersion,
         LPCWSTR wszMonadMajorVersion)
     {
         unsigned int exitCode = EXIT_CODE_SUCCESS;
@@ -554,7 +553,7 @@ namespace NativeMsh
                 break;
             }
 
-            // For PowerShell 3 and 4, the registry is 3. 
+            // For PowerShell 3 and 4, the registry is 3.
             if ((monadMajorVersion == 4) || (monadMajorVersion == 5))
             {
                 monadMajorVersion = 3;
@@ -871,20 +870,20 @@ namespace NativeMsh
     // The location where CoreCLR PowerShell Ext binaries are expected to be installed for inbox PowerShell.
     static PCSTR coreCLRPowerShellExtInstallDirectory = "%windir%\\system32\\CoreClrPowerShellExt\\v1.0\\";
 
-    // The default PowerShell install directory for inbox PowerShell. 
+    // The default PowerShell install directory for inbox PowerShell.
     // This location may be overridden by placing a config file in the same directory as the PowerShell host.
     static PCSTR powerShellInstallPath = "%windir%\\System32\\WindowsPowerShell\\v1.0\\";
 
     unsigned int PwrshCommon::IdentifyHostDirectory(
         HostEnvironment& hostEnvironment)
     {
-        // Discover the path to the plugin or the executable (pwrshplugin.dll or powershell.exe). 
+        // Discover the path to the plugin or the executable (pwrshplugin.dll or powershell.exe).
         // For PowerShell Core, the plugin no longer resides in %windir%\\system32 (it is in a sub-directory).
         // If pwrshplugin.dll is not loaded, it means that this is running via powershell.exe.
         wchar_t hostPath[MAX_PATH];
         DWORD thisModuleLength;
 
-        if (GetModuleHandleW(L"pwrshplugin.dll")) 
+        if (GetModuleHandleW(L"pwrshplugin.dll"))
         {
             thisModuleLength = GetModuleFileNameW(GetModuleHandleW(L"pwrshplugin.dll"), hostPath, MAX_PATH);
         }
@@ -897,7 +896,7 @@ namespace NativeMsh
             // TODO: Use GetLastError() to find the specific error #
             return EXIT_CODE_INIT_FAILURE;
         }
-        
+
         // Search for the last backslash in the host path.
         int lastBackslashIndex;
         for (lastBackslashIndex = thisModuleLength - 1; lastBackslashIndex >= 0; lastBackslashIndex--)
@@ -923,13 +922,13 @@ namespace NativeMsh
             hostEnvironment.SetHostDirectoryPathW(reader->GetPathToPowerShell().c_str());
             hostEnvironment.SetCoreCLRDirectoryPathW(reader->GetPathToCoreClr().c_str());
         }
-        else 
+        else
         {
             // There was an issue accessing or parsing the config file OR
             // we are working for the EXE.
             //
-            // TODO: This should not be the fallback for inbox PowerShell.exe. 
-            // It should use coreCLRInstallDirectory and coreCLRPowerShellExtInstallDirectory. 
+            // TODO: This should not be the fallback for inbox PowerShell.exe.
+            // It should use coreCLRInstallDirectory and coreCLRPowerShellExtInstallDirectory.
             //
             // Use the directory detected via GetModuleFileName + GetModuleHandle
             hostEnvironment.SetHostDirectoryPathW(hostPath);
@@ -1033,15 +1032,15 @@ namespace NativeMsh
     //
     //
 
-    PwrshCommon::PwrshCommon() 
+    PwrshCommon::PwrshCommon()
         : output(new PwrshCommonOutputDefault()), reader(new ConfigFileReader()), sysCalls(new WinSystemCallFacade())
     {
     }
 
     PwrshCommon::PwrshCommon(
-        IPwrshCommonOutput* outObj, 
+        IPwrshCommonOutput* outObj,
         ConfigFileReader* rdr,
-        SystemCallFacade* systemCalls) 
+        SystemCallFacade* systemCalls)
         : output(outObj), reader(rdr), sysCalls(systemCalls)
     {
         if (NULL == output)
@@ -1238,18 +1237,19 @@ namespace NativeMsh
     // Note: During successful calls the following values must be freed by the caller:
     //      pwszMonadVersion
     //      pwszRuntimeVersion
-    //      pwzsRegKeyValue
+    //      pwszRegKeyValue
     //
     // The caller must take care to check to see if they must be freed during error scenarios
     // because the function may fail after allocating one or more strings.
     //
+    _Success_(return == 0)
     unsigned int PwrshCommon::GetRegistryInfo(
-        __deref_out_opt PWSTR * pwszMonadVersion,
+        __out PWSTR * pwszMonadVersion,
         __inout_ecount(1) int * lpMonadMajorVersion,
         int monadMinorVersion,
-        __deref_out_opt PWSTR * pwszRuntimeVersion,
+        __out PWSTR * pwszRuntimeVersion,
         LPCWSTR lpszRegKeyNameToRead,
-        __deref_out_opt PWSTR * pwzsRegKeyValue)
+        __out PWSTR * pwszRegKeyValue)
     {
         HKEY hEngineKey = NULL;
         bool bEngineKeyOpened = true;
@@ -1257,12 +1257,27 @@ namespace NativeMsh
         wchar_t * wszMshEngineRegKeyPath = NULL;
         LPWSTR wszFullMonadVersion = NULL;
 
+        if (NULL != pwszRegKeyValue)
+        {
+            *pwszRegKeyValue = NULL;
+        }
+
+        if (NULL != pwszRuntimeVersion)
+        {
+            *pwszRuntimeVersion = NULL;
+        }
+
+        if (NULL != pwszMonadVersion)
+        {
+            *pwszMonadVersion = NULL;
+        }
+
         do
         {
             if (NULL == pwszMonadVersion ||
                 NULL == lpMonadMajorVersion ||
                 NULL == pwszRuntimeVersion ||
-                NULL == pwzsRegKeyValue)
+                NULL == pwszRegKeyValue)
             {
                 exitCode = EXIT_CODE_READ_REGISTRY_FAILURE;
                 break;
@@ -1315,7 +1330,7 @@ namespace NativeMsh
             {
                 LPCWSTR wszRequestedRegValueName = lpszRegKeyNameToRead;
                 if (!this->RegQueryREG_SZValue(hEngineKey, wszRequestedRegValueName,
-                    wszMshEngineRegKeyPath, pwzsRegKeyValue))
+                    wszMshEngineRegKeyPath, pwszRegKeyValue))
                 {
                     exitCode = EXIT_CODE_READ_REGISTRY_FAILURE;
                     break;
@@ -1361,12 +1376,13 @@ namespace NativeMsh
         return exitCode;
     }
 
+    _Success_(return == 0)
     unsigned int PwrshCommon::GetRegistryInfo(
-        __deref_out_opt PWSTR * pwszMonadVersion,
+        __out PWSTR * pwszMonadVersion,
         __inout_ecount(1) int * lpMonadMajorVersion,
         int monadMinorVersion,
-        __deref_out_opt PWSTR * pwszRuntimeVersion,
-        __deref_out_opt PWSTR * pwszConsoleHostAssemblyName)
+        __out PWSTR * pwszRuntimeVersion,
+        __out PWSTR * pwszConsoleHostAssemblyName)
     {
         return GetRegistryInfo(pwszMonadVersion,
             lpMonadMajorVersion,
@@ -1392,7 +1408,7 @@ namespace NativeMsh
             this->output->DisplayMessage(false, g_STARTING_CLR_FAILED, GetLastError());
             return exitCode;
         }
-        
+
         const int nMaxProps = 8;
         LPCSTR props[nMaxProps];
         LPCSTR vals[nMaxProps];
@@ -1413,13 +1429,13 @@ namespace NativeMsh
         }
         if (listEmpty)
         {
-            // No CoreCLR assemblies were found in either location. There is no 
+            // No CoreCLR assemblies were found in either location. There is no
             // point in continuing.
             this->output->DisplayMessage(false, g_STARTING_CLR_FAILED, GetLastError());
             return EXIT_CODE_INIT_FAILURE;
         }
 
-        props[nProps] = "TRUSTED_PLATFORM_ASSEMBLIES";        
+        props[nProps] = "TRUSTED_PLATFORM_ASSEMBLIES";
         std::string tempStr = assemblyList.str();
         vals[nProps] = tempStr.c_str();
         nProps++;
@@ -1433,7 +1449,7 @@ namespace NativeMsh
         nProps++;
 
         int hr = hostWrapper->InitializeClr(
-                hostEnvironment.GetHostDirectoryPath(), 
+                hostEnvironment.GetHostDirectoryPath(),
                 friendlyName,
                 nProps,
                 props,

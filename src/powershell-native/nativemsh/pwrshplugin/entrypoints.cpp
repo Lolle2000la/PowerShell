@@ -1,7 +1,7 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 // ----------------------------------------------------------------------
-//
-//  Microsoft Windows NT
-//  Copyright (C) Microsoft Corporation, 2007.
 //
 //  Contents:  Entry points for PowerShell plugin used to host powershell
 //  in a WSMan service.
@@ -31,15 +31,18 @@ LPCWSTR g_MAIN_BINARY_NAME = L"pwrshplugin.dll";
 // the caller should free pwszErrorMessage using LocalFree().
 // returns: If the function succeeds the return value is the number of CHARs stored int the output
 // buffer, excluding the terminating null character. If the function fails the return value is zero.
-#pragma prefast(push)
-#pragma prefast (disable: 28196)
-DWORD GetFormattedErrorMessage(__deref_out PWSTR * pwszErrorMessage, DWORD dwMessageId, va_list* arguments)
-#pragma prefast(pop)
+_Success_(return > 0)
+DWORD GetFormattedErrorMessage(__out PWSTR * pwszErrorMessage, DWORD dwMessageId, va_list* arguments)
 {
     DWORD dwLength = 0;
+    LPWSTR wszSystemErrorMessage = NULL;
 
-    do 
+    do
     {
+        if (NULL == pwszErrorMessage)
+        {
+            break;
+        }
         *pwszErrorMessage = NULL;
 
         if (NULL == g_hResourceInstance)
@@ -50,9 +53,7 @@ DWORD GetFormattedErrorMessage(__deref_out PWSTR * pwszErrorMessage, DWORD dwMes
             g_hResourceInstance = LoadMUILibraryW(g_MAIN_BINARY_NAME, MUI_LANGUAGE_NAME, 0);
 #endif
         }
-        
-        LPWSTR wszSystemErrorMessage = NULL;
-        //string function
+
         dwLength = FormatMessageW(
             FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_ALLOCATE_BUFFER,
             g_hResourceInstance,
@@ -62,28 +63,36 @@ DWORD GetFormattedErrorMessage(__deref_out PWSTR * pwszErrorMessage, DWORD dwMes
             0,
             arguments);
 
-        if (dwLength > 0)
+        if (dwLength == 0)
         {
-            *pwszErrorMessage = new WCHAR[dwLength + 1];
-            if (NULL != *pwszErrorMessage)
-            {
-                //string function
-                if (FAILED(StringCchCopyW(*pwszErrorMessage, dwLength + 1, wszSystemErrorMessage)))
-                {
-                    dwLength = 0;
-                    delete [] (*pwszErrorMessage);
-                    *pwszErrorMessage = NULL;
-                }
-            }
-            LocalFree(wszSystemErrorMessage);
+            break;
         }
 
-    }while(false);    
+        *pwszErrorMessage = new WCHAR[dwLength + 1];
+        if (*pwszErrorMessage == NULL)
+        {
+            dwLength = 0;
+            break;
+        }
+
+        if (FAILED(StringCchCopyW(*pwszErrorMessage, dwLength + 1, wszSystemErrorMessage)))
+        {
+            dwLength = 0;
+            delete [] (*pwszErrorMessage);
+            *pwszErrorMessage = NULL;
+        }
+
+    }while(false);
+
+    if (NULL != wszSystemErrorMessage)
+    {
+        LocalFree(wszSystemErrorMessage);
+    }
 
     return dwLength;
 }
 
-DWORD GetFormattedErrorMessage(__deref_out PZPWSTR pwszErrorMessage, DWORD dwMessageId, ...)
+DWORD GetFormattedErrorMessage(__out PWSTR * pwszErrorMessage, DWORD dwMessageId, ...)
 {
     DWORD result = 0;
 
@@ -101,8 +110,8 @@ DWORD GetFormattedErrorMessage(__deref_out PZPWSTR pwszErrorMessage, DWORD dwMes
 #pragma prefast (disable: 6101)
 #pragma prefast (disable: 6054)
 
-unsigned int ConstructPowerShellVersion(int iPSMajorVersion, 
-                                        int iPSMinorVersion, 
+unsigned int ConstructPowerShellVersion(int iPSMajorVersion,
+                                        int iPSMinorVersion,
                                         __deref_out_opt PWSTR *pwszMonadVersion)
 {
     unsigned int exitCode = EXIT_CODE_SUCCESS;
@@ -187,7 +196,7 @@ static PwrshCommon sPwrshCommon;
 // returns: 0 on success, non-zero on failure.
 _Success_(return == 0) //EXIT_CODE_SUCCESS
 extern "C"
-unsigned int GetCLRVersionForPSVersion(int iPSMajorVersion, 
+unsigned int GetCLRVersionForPSVersion(int iPSMajorVersion,
                                int iPSMinorVersion,
                                size_t runtimeVersionLength,
                               __inout_ecount_part(runtimeVersionLength, *pRuntimeVersionLength) wchar_t* pwszRuntimeVersion,
@@ -211,24 +220,24 @@ unsigned int GetCLRVersionForPSVersion(int iPSMajorVersion,
         int requestedMonadMinorVersion = iPSMinorVersion;
 
         // For GetRegistryInfo call, monadMajorVersion is used to calculate the version key in registry.
-        // For PowerShell V2, version key in registry is 1. 
+        // For PowerShell V2, version key in registry is 1.
         if (2 == requestedMonadMajorVersion)
         {
             requestedMonadMajorVersion = 1;
         }
 
-        // For PowerShell 3, 4 and 5, the registry is 3.  
+        // For PowerShell 3, 4 and 5, the registry is 3.
         if ((requestedMonadMajorVersion == 4) || (requestedMonadMajorVersion == 5))
         {
             requestedMonadMajorVersion = 3;
         }
-        
+
         exitCode = ConstructPowerShellVersion(iPSMajorVersion, iPSMinorVersion, &wszMonadVersion);
         if (EXIT_CODE_SUCCESS != exitCode)
         {
-            break;        
+            break;
         }
-        
+
         exitCode = sPwrshCommon.GetRegistryInfo(
                 &wszMonadVersion,
                 &requestedMonadMajorVersion,
@@ -248,7 +257,7 @@ unsigned int GetCLRVersionForPSVersion(int iPSMajorVersion,
             exitCode = EXIT_CODE_READ_REGISTRY_FAILURE;
             break;
         }
-        
+
         if (NULL != pwszRuntimeVersion)
         {
             // +1 for the '\0'
@@ -307,12 +316,19 @@ DWORD ReportOperationComplete(WSMAN_PLUGIN_REQUEST *requestDetails, DWORD errorC
 
     DWORD result = EXIT_CODE_SUCCESS;
     PWSTR pwszErrorMessage = NULL;
-    GetFormattedErrorMessage(&pwszErrorMessage, errorCode);
- 
-    result = WSManPluginOperationComplete(requestDetails, 0, errorCode, pwszErrorMessage);
-
-    if (NULL != pwszErrorMessage)
+    if (GetFormattedErrorMessage(&pwszErrorMessage, errorCode) == 0)
     {
+        /* if an error message could not be loaded, generate a fallback
+           message to provide a level of diagnosability.
+        */
+        WCHAR szFallbackMessageMessage[64] = L"\0";
+        swprintf_s(szFallbackMessageMessage, _countof(szFallbackMessageMessage), L"ReportOperationComplete: %d", errorCode);
+
+        result = WSManPluginOperationComplete(requestDetails, 0, errorCode, szFallbackMessageMessage);
+    }
+    else
+    {
+        result = WSManPluginOperationComplete(requestDetails, 0, errorCode, pwszErrorMessage);
         delete[] pwszErrorMessage;
     }
 
@@ -320,8 +336,8 @@ DWORD ReportOperationComplete(WSMAN_PLUGIN_REQUEST *requestDetails, DWORD errorC
 }
 
 // -----------------------------------------------------------------------------
-// Each plug-in needs to support the Startup callback.  A plug-in may be 
-// initialized more than once within the same process, but only once per 
+// Each plug-in needs to support the Startup callback.  A plug-in may be
+// initialized more than once within the same process, but only once per
 // applicationIdentification.
 // -----------------------------------------------------------------------------
 extern "C"
@@ -332,7 +348,7 @@ DWORD WINAPI WSManPluginStartup(
     __out PVOID *pluginContext
     )
 {
-// 
+//
 #ifdef REMOTINGDEBUG
      // This loop is added to assist debugging server.
     // Attach a debugger to the server and set this variable to true
@@ -346,7 +362,7 @@ DWORD WINAPI WSManPluginStartup(
 
     PwrshPlugIn* result = NULL;
     try
-    {        
+    {
         *pluginContext = NULL;
         PwrshPlugInMediator* pluginMediator = PwrshPlugInMediator::GetPwrshPlugInMediator(extraInfo);
 
@@ -368,7 +384,7 @@ DWORD WINAPI WSManPluginStartup(
         //     {
         //         pfnWinSqmSetDWORD(
         //             NULL,
-        //             DATAID_WINRMREMOTEENABLED, 
+        //             DATAID_WINRMREMOTEENABLED,
         //             WINRM_SQM_DATA_REMOTEENABLED
         //             );
         //     }
@@ -396,16 +412,16 @@ DWORD WINAPI WSManPluginStartup(
 
 // ------------------------------------------------------------------------------------
 //The WSManPluginShutdown method is called after all operations have been cancelled and
-//right before the DLL is unloaded.  The DLL entry point name must be WSManPluginShutdown. 
-//This method has an important purpose of making sure all plug-in threads are shut down 
-//before this method returns.  If the plug-in only handles synchronous operations and all 
-//threads report a cancellation result before they return then this method does not have to 
-//do anything too complex other than plug-in cleanup.  However for an asynchronous plug-in, 
-//any threads that are used to process the plug-in threads, including the ones that just reported 
+//right before the DLL is unloaded.  The DLL entry point name must be WSManPluginShutdown.
+//This method has an important purpose of making sure all plug-in threads are shut down
+//before this method returns.  If the plug-in only handles synchronous operations and all
+//threads report a cancellation result before they return then this method does not have to
+//do anything too complex other than plug-in cleanup.  However for an asynchronous plug-in,
+//any threads that are used to process the plug-in threads, including the ones that just reported
 //the cancellation for all operations need to completely shutdown.  Not doing this will cause
 //potential crashes in the DLL because code may be executed after the DLL is unloaded.
 // ------------------------------------------------------------------------------------
-// reason: If this is a system shutdown this will be WSMAN_PLUGIN_SHUTDOWN_SYSTEM.  
+// reason: If this is a system shutdown this will be WSMAN_PLUGIN_SHUTDOWN_SYSTEM.
 // For WSMan service shutdown this will be WSMAN_PLUGIN_SHUTDOWN_SERVICE.  For an IIS host
 //shutdown this will be WSMAN_PLUGIN_SHUTDOWN_IISHOST.
 extern "C"
@@ -414,7 +430,7 @@ DWORD WINAPI WSManPluginShutdown(
     __in DWORD flags,
     __in DWORD reason
     )
-{        
+{
     if (NULL == pluginContext)
     {
         return g_NULL_PLUGIN_CONTEXT;
@@ -429,11 +445,11 @@ DWORD WINAPI WSManPluginShutdown(
     {
         // ignore plugin exceptions during shutdown.
         if (NULL != e)
-        {         
+        {
             delete e;
         }
     }
-    
+
     // free resources occupied by this plugin..
     // WSMan frees shell/command resources before calling
     // plugin shutdown.
@@ -444,15 +460,15 @@ DWORD WINAPI WSManPluginShutdown(
 }
 
 #ifndef WIN32_FROM_HRESULT
-#define WIN32_FROM_HRESULT(hr) (HRESULT_FACILITY(hr) == FACILITY_WIN32 ? HRESULT_CODE(hr) : hr) 
+#define WIN32_FROM_HRESULT(hr) (HRESULT_FACILITY(hr) == FACILITY_WIN32 ? HRESULT_CODE(hr) : hr)
 #endif
 
 // -----------------------------------------------------------------------------
 // A plug-in that supports the Shell operations needs to implement this callback
 // to allow commands to be created and to allow data to be streamed into either
-// a shell or command.  The plug-in must call WSManPluginReportContext to 
+// a shell or command.  The plug-in must call WSManPluginReportContext to
 // report the shell context.  Once the shell is completed or when it is closed
-// via the operationClosed boolean value or operationClosedHandle in the 
+// via the operationClosed boolean value or operationClosedHandle in the
 // requestDetails the plug-in needs to call WSManPluginOperationComplete.
 // The shell is active until this time.
 // -----------------------------------------------------------------------------
@@ -490,7 +506,7 @@ VOID WINAPI WSManPluginShell(
         }
         else if (hr == RPC_E_CHANGED_MODE)
         {
-            comInitialized = false; //ignore 
+            comInitialized = false; //ignore
         }
         else
         {
@@ -526,9 +542,9 @@ VOID WINAPI WSManPluginShell(
 }
 
 // -----------------------------------------------------------------------------
-// WS-Man calls the WSMAN_PLUGIN_RELEASE_SHELL_CONTEXT entry point during shell 
-// shutdown when it is safe to delete the plug-in shell context. Any context 
-// reported through WSManPluginReportContext may not be deleted until the 
+// WS-Man calls the WSMAN_PLUGIN_RELEASE_SHELL_CONTEXT entry point during shell
+// shutdown when it is safe to delete the plug-in shell context. Any context
+// reported through WSManPluginReportContext may not be deleted until the
 // corresponding release function has been called. Failure to follow the contract
 // will result in errors being generated.
 // -----------------------------------------------------------------------------
@@ -549,7 +565,7 @@ VOID WINAPI WSManPluginReleaseShellContext(__in PVOID shellContext)
     {
         // ignore plugin exceptions.
         if (NULL != e)
-        {         
+        {
             delete e;
         }
     }
@@ -559,9 +575,9 @@ VOID WINAPI WSManPluginReleaseShellContext(__in PVOID shellContext)
 // -----------------------------------------------------------------------------
 // A plug-in that supports the Shell operations and needs to create commands
 // that are associated with the shell needs to implement this callback.
-// The plug-in must call WSManPluginReportContext to 
+// The plug-in must call WSManPluginReportContext to
 // report the command context.  Once the command is completed or when it is closed
-// via the operationClosed boolean value or operationClosedHandle in the 
+// via the operationClosed boolean value or operationClosedHandle in the
 // requestDetails the plug-in needs to call WSManPluginOperationComplete.
 // The command is active until this time.
 // -----------------------------------------------------------------------------
@@ -593,9 +609,9 @@ VOID WINAPI WSManPluginCommand(
 }
 
 // ---------------------------------------------------------------------------------
-// WS-Man calls the WSMAN_PLUGIN_RELEASE_COMMAND_CONTEXT entry point during command 
-// shutdown when it is safe to delete the plug-in shell context. Any context 
-// reported through WSManPluginReportContext may not be deleted until the 
+// WS-Man calls the WSMAN_PLUGIN_RELEASE_COMMAND_CONTEXT entry point during command
+// shutdown when it is safe to delete the plug-in shell context. Any context
+// reported through WSManPluginReportContext may not be deleted until the
 // corresponding release function has been called. Failure to follow the contract
 // will result in errors being generated.
 // ---------------------------------------------------------------------------------
@@ -619,7 +635,7 @@ VOID WINAPI WSManPluginReleaseCommandContext(
     {
         // ignore plugin exceptions.
         if (NULL != e)
-        {         
+        {
             delete e;
         }
     }
@@ -628,7 +644,7 @@ VOID WINAPI WSManPluginReleaseCommandContext(
 // -----------------------------------------------------------------------------
 // A plug-in receives an inbound data stream to either the shell or command
 // via this callback.  Each piece of data causes the callback to be called once.
-// For each piece of data the plug-in calls WSManPluginResultComplete to 
+// For each piece of data the plug-in calls WSManPluginResultComplete to
 // acknowledge receipt and to allow the next piece of data to be delivered.
 // -----------------------------------------------------------------------------
 extern "C"
@@ -664,11 +680,11 @@ VOID WINAPI WSManPluginSend(
 // via this callback.  This API is called when an inbound request from a client
 // is received.  This callback may be called against the shell and/or command
 // based on the client request.  Each piece of data that needs to be sent back
-// to the client is done so through the WSManPluginReceiveResult API.  Once 
+// to the client is done so through the WSManPluginReceiveResult API.  Once
 // all data has been send, when the stream is terminated via some internal means,
-// or if the receive call is cancelled through the operationClosed boolean 
-// value or operationClosedHandle, the plug-in needs to call 
-// WSManPluginResultComplete.  The operation is marked as active until this 
+// or if the receive call is cancelled through the operationClosed boolean
+// value or operationClosedHandle, the plug-in needs to call
+// WSManPluginResultComplete.  The operation is marked as active until this
 // time.
 // -----------------------------------------------------------------------------
 extern "C"
@@ -701,7 +717,7 @@ VOID WINAPI WSManPluginReceive(
 // -----------------------------------------------------------------------------
 // A plug-in receives an inbound signal to either the shell or command
 // via this callback.  Each signal causes the callback to be called once.
-// For each callthe plug-in calls WSManPluginResultComplete to 
+// For each callthe plug-in calls WSManPluginResultComplete to
 // acknowledge receipt and to allow the next signal to be received.
 // A signal can cause the shell or command to be terminated, so the result
 // of this callback may be many completion calls for the Signal, Receive, Command

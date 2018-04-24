@@ -1,6 +1,5 @@
-﻿/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections;
 using System.Collections.Concurrent;
@@ -675,7 +674,6 @@ namespace System.Management.Automation
             return Create(runspace, filter, null, null, receiveImmediately);
         }
 
-
         /// <summary>
         /// Queries the runspace for jobs and constructs a collection of job proxies to interact with them.
         /// </summary>
@@ -769,8 +767,7 @@ namespace System.Management.Automation
 
             using (PowerShell ps = PowerShell.Create())
             {
-                Dbg.Assert(runspacePool == null && runspace != null ||
-                    runspace == null && runspacePool != null, "Either a runspace or a runspacepool should be used, not both.");
+                Dbg.Assert(runspacePool == null ^ runspace == null, "Either a runspace or a runspacepool should be used, not both.");
 
                 if (runspacePool == null)
                 {
@@ -1360,7 +1357,6 @@ namespace System.Management.Automation
 
                     AssignRunspaceOrRunspacePool(powershell);
 
-
                     // set the commands for the powershell
                     powershell.Commands.AddCommand("Remove-Job").AddParameter("InstanceId", _remoteJobInstanceId);
 
@@ -1493,9 +1489,7 @@ namespace System.Management.Automation
         /// happen</param>
         private void AssignRunspaceOrRunspacePool(PowerShell powershell)
         {
-            Dbg.Assert(_runspacePool == null && _runspace != null ||
-                       _runspace == null && _runspacePool != null,
-                       "Either a runspace or a runspacepool should be assigned to the proxy job");
+            Dbg.Assert(_runspacePool == null ^ _runspace == null, "Either a runspace or a runspacepool should be assigned to the proxy job");
 
             if (_runspacePool == null)
             {

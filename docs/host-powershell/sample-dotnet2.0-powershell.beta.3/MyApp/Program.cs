@@ -1,13 +1,12 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 using System.Management.Automation;
 
 namespace Application.Test
 {
-    public class Program 
+    public class Program
     {
         /// <summary>
         /// Managed entry point shim, which starts the actual program

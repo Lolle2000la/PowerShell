@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Management.Automation;
 using System.Management.Automation.Internal;
@@ -28,8 +27,7 @@ namespace Microsoft.PowerShell.Commands
         ///
         internal override void BeforeOpenStreams(string[] paths)
         {
-            if (paths == null ||
-                (paths != null && paths.Length == 0))
+            if (paths == null || paths.Length == 0)
             {
                 throw PSTraceSource.NewArgumentNullException("paths");
             }

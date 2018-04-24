@@ -1,8 +1,8 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 /********************************************************************++
-    Copyright (C) Microsoft Corporation, 2003
 
     Project:     PowerShell
-
 
     Contents:    PowerShell error interface for syntax editors
 

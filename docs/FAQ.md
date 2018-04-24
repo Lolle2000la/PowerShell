@@ -43,17 +43,14 @@ Read [An Introduction To Error Handling in PowerShell][error] for more informati
 The SDK NuGet package `Microsoft.PowerShell.SDK` is provided for developers to write .NET Core C# code targeting PowerShell Core.
 PowerShell NuGet packages for releases starting from v6.0.0-alpha.9 will be published to the [powershell-core][] myget feed.
 
-To use the `Microsoft.PowerShell.SDK` NuGet package, declare the `frameworks` section in your `project.json` file as follows:
+To use the `Microsoft.PowerShell.SDK` NuGet package, declare `PackageReference` tags in your `.csproj` file as follows:
 
-```json
-"frameworks": {
-    "netstandard1.6": {
-        "imports": [ "dnxcore50", "portable-net45+win8" ],
-        "dependencies": {
-            "Microsoft.PowerShell.SDK": "6.0.0-alpha13"
-        }
-    }
-}
+```xml
+<ItemGroup>
+  <PackageReference Include="Microsoft.PowerShell.SDK" Version="6.0.0-beta.9" />
+  <PackageReference Include="Microsoft.PowerShell.Commands.Diagnostics" Version="6.0.0-beta.9" />
+  <PackageReference Include="Microsoft.WSMan.Management" Version="6.0.0-beta.9"/>
+</ItemGroup>
 ```
 
 [powershell-core]: https://powershell.myget.org/gallery/powershell-core
@@ -107,7 +104,7 @@ that new packages' binaries get stomped on by old packages' binaries.
 
 ## Why is my submodule empty?
 
-If a submodule (such as `src/Modules/Pester`) is empty, that means it is
+If a submodule (such as `src/libpsl-native/test/googletest`) is empty, that means it is
 uninitialized.
 If you've already cloned, you can do this with:
 
@@ -125,14 +122,12 @@ git submodule status
 If they're initialized, it will look like this:
 
 ```output
-f23641488f8d7bf8630ca3496e61562aa3a64009 src/Modules/Pester (f23641488)
 c99458533a9b4c743ed51537e25989ea55944908 src/libpsl-native/test/googletest (release-1.7.0)
 ```
 
 If they're not, there will be minuses in front (and the folders will be empty):
 
 ```output
--f23641488f8d7bf8630ca3496e61562aa3a64009 src/Modules/Pester (f23641488)
 -c99458533a9b4c743ed51537e25989ea55944908 src/libpsl-native/test/googletest (release-1.7.0)
 ```
 

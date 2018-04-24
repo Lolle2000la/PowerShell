@@ -1,6 +1,5 @@
-/********************************************************************++
- * Copyright (c) Microsoft Corporation.  All rights reserved.
- * --********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 /*
  * Common file that contains implementation for both server and client transport
@@ -376,7 +375,6 @@ namespace System.Management.Automation.Remoting
         #endregion
     }
 
-
     /// <summary>
     /// A wrapper around TextWriter to allow for synchronized writing to a stream.
     /// Synchronization is required to avoid collision when multiple TransportManager's
@@ -625,7 +623,7 @@ namespace System.Management.Automation.Remoting.Client
             lock (syncObject)
             {
                 // We always need to remove commands from collection, even if isClosed is true.
-                // If we don't then we hang because CloseAsync() will not complete until all
+                // If we don't then we will not respond because CloseAsync() will not complete until all
                 // commands are closed.
                 if (!_cmdTransportManagers.Remove(key))
                 {
@@ -948,7 +946,7 @@ namespace System.Management.Automation.Remoting.Client
         #region Overrides
 
         /// <summary>
-        /// Launch a new Process (PowerShell.exe -s) to perform remoting. This is used by *-Job cmdlets
+        /// Launch a new Process (pwsh -s) to perform remoting. This is used by *-Job cmdlets
         /// to support background jobs without depending on WinRM (WinRM has complex requirements like
         /// elevation to support local machine remoting)
         /// </summary>
@@ -1555,7 +1553,7 @@ namespace System.Management.Automation.Remoting.Client
                     "Transport manager error thread ended with error: {0}", errorMsg);
 
                 PSRemotingTransportException psrte = new PSRemotingTransportException(
-                    StringUtil.Format(RemotingErrorIdStrings.SSHClientEndWithErrorMessage, errorMsg), 
+                    StringUtil.Format(RemotingErrorIdStrings.SSHClientEndWithErrorMessage, errorMsg),
                     e);
                 HandleSSHError(psrte);
             }
@@ -1642,7 +1640,7 @@ namespace System.Management.Automation.Remoting.Client
                     if (data == null)
                     {
                         // End of stream indicates that the SSH transport is broken.
-                        // SSH will return the appropriate error in StdErr stream so 
+                        // SSH will return the appropriate error in StdErr stream so
                         // let the error reader thread report the error.
                         break;
                     }

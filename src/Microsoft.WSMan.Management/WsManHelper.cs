@@ -1,6 +1,6 @@
-//
-//    Copyright (C) Microsoft.  All rights reserved.
-//
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -88,7 +88,6 @@ namespace Microsoft.WSMan.Management
 
         private static ResourceManager _resourceMgr = new ResourceManager("Microsoft.WSMan.Management.resources.WsManResources", typeof(WSManHelper).GetTypeInfo().Assembly);
 
-
         //
         //
         //Below class is just a static container which would release sessions in case this DLL is unloaded.
@@ -108,7 +107,6 @@ namespace Microsoft.WSMan.Management
         //
         //
         //
-
 
         internal static void ReleaseSessions()
         {
@@ -199,7 +197,6 @@ namespace Microsoft.WSMan.Management
             }
             return result;
         }
-
 
         /// <summary>
         /// add a session to dictionary
@@ -495,20 +492,7 @@ namespace Microsoft.WSMan.Management
 
         internal string GetXmlNs(string resUri)
         {
-
-            string tmpNs = null;
-
-            if (resUri.ToLowerInvariant().Contains(URI_IPMI) || (resUri.ToLowerInvariant().Contains(URI_WMI)))
-                tmpNs = StripParams(resUri);
-            else
-            {
-                //tmpNs = StripParams(resUri) + ".xsd";
-                //This was reported by Intel as an interop issue. So now we are not appending a .xsd in the end.
-                tmpNs = StripParams(resUri);
-            }
-
-            return (@"xmlns:p=""" + tmpNs + @"""");
-
+            return (@"xmlns:p=""" + StripParams(resUri) + @"""");
         }
 
         internal XmlNode GetXmlNode(string xmlString, string xpathpattern, string xmlnamespace)
@@ -580,7 +564,6 @@ namespace Microsoft.WSMan.Management
             try
             {
                 m_resource = (IWSManResourceLocator)wsmanObj.CreateResourceLocator(resource);
-
 
                 if (optionset != null)
                 {
@@ -778,7 +761,6 @@ namespace Microsoft.WSMan.Management
                         connObject.SetProxy((int)sessionoption.ProxyAccessType, (int)sessionoption.ProxyAuthentication, null, null);
                     }
 
-
                 }
                 if (sessionoption.SkipCACheck)
                 {
@@ -842,7 +824,6 @@ namespace Microsoft.WSMan.Management
 
         internal void CleanUp()
         {
-
 
             if (_sr != null)
             {
@@ -1110,7 +1091,6 @@ namespace Microsoft.WSMan.Management
                 throw (e);
             }
 
-
         }
 
         /// <summary>
@@ -1138,7 +1118,6 @@ namespace Microsoft.WSMan.Management
         ///
         /// </summary>
         private static Dictionary<string, string> ResourceValueCache = new Dictionary<string, string>();
-
 
     }
 }

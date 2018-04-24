@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
 $script:forcePull = $true
 # Get docker Engine OS
 function Get-DockerEngineOs
@@ -5,7 +8,7 @@ function Get-DockerEngineOs
     docker info --format '{{ .OperatingSystem }}'
 }
 
-# Call Docker with appropriate result checksfunction Invoke-Docker 
+# Call Docker with appropriate result checksfunction Invoke-Docker
 function Invoke-Docker
 {
     param(
@@ -33,7 +36,7 @@ function Invoke-Docker
     {
         $result = docker $command $params 2>&1
     }
-    else 
+    else
     {
         &'docker' $command $params 2>&1 | Tee-Object -Variable result -ErrorAction SilentlyContinue | Out-String -Stream -ErrorAction SilentlyContinue | Write-Host -ErrorAction SilentlyContinue
     }
@@ -58,21 +61,21 @@ function Invoke-Docker
     {
         return $false
     }
-    
+
     return $true
 }
 
 # Return a list of Linux Container Test Cases
 function Get-LinuxContainer
 {
-    foreach($os in 'amazonlinux','centos7','opensuse42.2','ubuntu14.04','ubuntu16.04')
+    foreach($os in 'centos7','ubuntu14.04','ubuntu16.04')
     {
         Write-Output @{
             Name = $os
             Path = "$psscriptroot/../release/$os"
         }
     }
-    
+
 }
 
 # Return a list of Windows Container Test Cases
@@ -86,7 +89,6 @@ function Get-WindowsContainer
         }
     }
 }
-
 
 $script:repoName = 'microsoft/powershell'
 function Get-RepoName
@@ -110,14 +112,34 @@ function Test-SkipWindows
 
 function Test-SkipLinux
 {
-    return !((Get-DockerEngineOs) -like 'Alpine Linux*')
+    $os = Get-DockerEngineOs
+
+    switch -wildcard ($os)
+    {
+        '*Linux*' {
+            return $false
+        }
+        '*Mac' {
+            return $false
+        }
+        # Docker for Windows means we are running the linux kernel
+        'Docker for Windows' {
+            return $false
+        }
+        'Windows*' {
+            return $true
+        }
+        default {
+            throw "Unknow docker os '$os'"
+        }
+    }
 }
 
 function Get-TestContext
 {
     param(
         [ValidateSet('Linux','Windows','macOS')]
-        [string]$Type 
+        [string]$Type
     )
 
     $resultFileName = 'results.xml'
@@ -151,7 +173,7 @@ function Get-ContainerPowerShellVersion
         [string] $RepoName,
         [string] $Name
     )
-    
+
     $imageTag = "${script:repoName}:${Name}"
 
     if($TestContext.ForcePull)
@@ -178,7 +200,7 @@ function Get-ContainerPowerShellVersion
     }
 
     $runParams += $imageTag
-    $runParams += 'powershell'
+    $runParams += 'pwsh'
     $runParams += '-c'
     $runParams += ('$PSVersionTable.PSVersion.ToString() | out-string | out-file -encoding ascii -FilePath '+$testContext.containerLogPath)
 
@@ -189,4 +211,75 @@ function Get-ContainerPowerShellVersion
         $null = Invoke-Docker -Command container, rm -Params $volumeName, '--force' -SuppressHostOutput
     }
     return (Get-Content -Encoding Ascii $testContext.resolvedLogPath)[0]
+}
+
+# This function is used for basic validation of PS packages during a release;
+# During the process Docker files are filled out and executed with Docker build;
+# During the build PS packages are downloaded onto Docker containers, installed and selected Pester tests from PowerShell Github repo are executed.
+# This function must be run on a Docker host machine in 'Linux containers' mode, such as Windows 10 server with Hyper-V role installed.
+function Test-PSPackage
+{
+    param(
+        [string]
+        [Parameter(Mandatory=$true)]
+        $PSPackageLocation, # e.g. Azure storage
+        [string]
+        $PSVersion = "6.0.2",
+        [string]
+        $TestList = "/PowerShell/test/powershell/Modules/PackageManagement/PackageManagement.Tests.ps1,/PowerShell/test/powershell/engine/Module",
+        [string]
+        $GitLocation = "https://github.com/PowerShell/PowerShell.git"
+    )
+
+    $PSPackageLocation = $PSPackageLocation.TrimEnd('/','\')
+    Write-Verbose "Ensure that PowerShell packages of version $PSVersion exist at $PSPackageLocation" -Verbose
+
+    $tempFolder = $env:Temp
+    if (-not $tempFolder) {$tempFolder = "~"}
+    $RootFolder = Join-Path $tempFolder 'PSPackageDockerValidation'
+    $SourceFolder = Join-Path $PSScriptRoot 'Templates'
+
+    if (Test-Path $RootFolder)
+    {
+        Remove-Item $RootFolder -Recurse -Force
+    }
+
+    Copy-Item -Recurse $SourceFolder $RootFolder
+
+    $versionRpmStubName = 'PSVERSIONSTUBRPM'
+    $versionRpmStubValue = $PSVersion -replace '-','_'
+    $versionStubName = 'PSVERSIONSTUB'
+    $versionStubValue = $PSVersion
+    $testlistStubName = 'TESTLISTSTUB'
+    $testlistStubValue = $TestList
+    $packageLocationStubName = 'PACKAGELOCATIONSTUB'
+    $packageLocationStubValue = $PSPackageLocation
+    $GitLocationStubName = 'GITLOCATION'
+    $GitLocationStubValue = $GitLocation
+
+    $results = @{}
+    $returnValue = $true
+
+    # run builds sequentially, but don't block for errors so that configs after failed one can run
+    foreach($dir in Get-ChildItem -Path $RootFolder)
+    {
+        $buildArgs = @()
+        $buildArgs += "--build-arg","$versionRpmStubName=$versionRpmStubValue"
+        $buildArgs += "--build-arg","$versionStubName=$versionStubValue"
+        $buildArgs += "--build-arg","$testlistStubName=$testlistStubValue"
+        $buildArgs += "--build-arg","$packageLocationStubName=$packageLocationStubValue"
+        $buildArgs += "--build-arg","$GitLocationStubName=$GitLocationStubValue"
+        $buildArgs += "--no-cache"
+        $buildArgs += $dir.FullName
+
+        $dockerResult = Invoke-Docker -Command 'build' -Params $buildArgs -FailureAction warning
+        $results.Add($dir.Name, $dockerResult)
+        if (-not $dockerResult) {$returnValue = $false}
+    }
+
+    # in the end print results for all configurations
+    Write-Verbose "Package validation results:" -Verbose
+    $results
+
+    return $returnValue
 }

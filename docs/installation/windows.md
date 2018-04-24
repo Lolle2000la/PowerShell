@@ -3,14 +3,14 @@
 ## MSI
 
 To install PowerShell on Windows Full SKU (works on Windows 7 SP1 and later), download either the MSI from [AppVeyor][] for a nightly build,
-or a released package from our GitHub [releases][] page. The MSI file looks like this - `PowerShell-6.0.0.<buildversion>.<os-arch>.msi`
+or a released package from our GitHub [releases][] page.
 
 Once downloaded, double-click the installer and follow the prompts.
 
 There is a shortcut placed in the Start Menu upon installation.
 
 * By default the package is installed to `$env:ProgramFiles\PowerShell\`
-* You can launch PowerShell via the Start Menu or `$env:ProgramFiles\PowerShell\powershell.exe`
+* You can launch PowerShell via the Start Menu or `pwsh` from a new command prompt.
 
 ### Prerequisites
 
@@ -22,6 +22,55 @@ To enable PowerShell remoting over WinRM, the following prerequisites need to be
 * Install the Windows Management Framework (WMF) [4.0](https://www.microsoft.com/download/details.aspx?id=40855)
   or newer ([5.0](https://www.microsoft.com/download/details.aspx?id=50395),
   [5.1](https://www.microsoft.com/download/details.aspx?id=54616)) on Windows 7.
+
+## ZIP
+
+PowerShell binary ZIP archives are provided to enable advanced deployment scenarios.
+Be noted that when using the ZIP archive, you won't get the prerequisites check as in the MSI package.
+So in order for remoting over WinRM to work properly on Windows versions prior to Windows 10,
+you need to make sure the [prerequisites](#prerequisites) are met.
+
+## Deploying on Windows IoT
+
+Windows IoT already comes with Windows PowerShell which we will use to deploy PowerShell Core 6.
+
+* Create `PSSession` to target device
+
+```powershell
+$s = New-PSSession -ComputerName <deviceIp> -Credential Administrator
+```
+
+* Copy the zip package to the device
+
+```powershell
+# change the destination to however you had partitioned it with sufficient space for the zip and the unzipped contents
+# the path should be local to the device
+Copy-Item .\PowerShell-6.0.2-win-arm32.zip -Destination u:\users\administrator\Downloads -ToSession $s
+```
+
+* Connect to the device and expand the archive
+
+```powershell
+Enter-PSSession $s
+cd u:\users\administrator\downloads
+Expand-Archive .\PowerShell-6.0.2-win-arm32.zip
+```
+
+* Setup remoting to PowerShell Core 6
+
+```powershell
+cd .\PowerShell-6.0.2-win-arm32
+# Be sure to use the -PowerShellHome parameter otherwise it'll try to create a new endpoint with Windows PowerShell 5.1
+.\Install-PowerShellRemoting.ps1 -PowerShellHome .
+# You'll get an error message and will be disconnected from the device because it has to restart WinRM
+```
+
+* Connect to PowerShell Core 6 endpoint on device
+
+```powershell
+# Be sure to use the -Configuration parameter.  If you omit it, you will connect to Windows PowerShell 5.1
+Enter-PSSession -ComputerName <deviceIp> -Credential Administrator -Configuration powershell.6.0.2
+```
 
 ## Deploying on Nano Server
 
@@ -106,13 +155,13 @@ Install-PowerShellRemoting.ps1
 #### Executed by another instance of PowerShell on behalf of the instance that it will register
 
 ``` powershell
-<path to powershell>\Install-PowerShellRemoting.ps1 -PowerShellHome "<absolute path to the instance's $PSHOME>" -PowerShellVersion "<the powershell version tag>"
+<path to powershell>\Install-PowerShellRemoting.ps1 -PowerShellHome "<absolute path to the instance's $PSHOME>"
 ```
 
 For Example:
 
 ``` powershell
-C:\Program Files\PowerShell\6.0.0.9\Install-PowerShellRemoting.ps1 -PowerShellHome "C:\Program Files\PowerShell\6.0.0.9\" -PowerShellVersion "6.0.0-alpha.9"
+& 'C:\Program Files\PowerShell\6.0.2\Install-PowerShellRemoting.ps1' -PowerShellHome 'C:\Program Files\PowerShell\6.0.2\'
 ```
 
 **NOTE:** The remoting registration script will restart WinRM, so all existing PSRP sessions will terminate immediately after the script is run. If run during a remote session, this will terminate the connection.
@@ -122,8 +171,8 @@ C:\Program Files\PowerShell\6.0.0.9\Install-PowerShellRemoting.ps1 -PowerShellHo
 Create a PowerShell session to the new PowerShell endpoint by specifying `-ConfigurationName "some endpoint name"`. To connect to the PowerShell instance from the example above, use either:
 
 ``` powershell
-New-PSSession ... -ConfigurationName "powershell.6.0.0-alpha.9"
-Enter-PSSession ... -ConfigurationName "powershell.6.0.0-alpha.9"
+New-PSSession ... -ConfigurationName "powershell.6.0.2"
+Enter-PSSession ... -ConfigurationName "powershell.6.0.2"
 ```
 
 Note that `New-PSSession` and `Enter-PSSession` invocations that do not specify `-ConfigurationName` will target the default PowerShell endpoint, `microsoft.powershell`.
@@ -142,4 +191,4 @@ We publish an archive with CoreCLR bits on every CI build with [AppVeyor][].
 * Unblock zip file: right-click in File Explorer -> Properties ->
   check 'Unblock' box -> apply
 * Extract zip file to `bin` directory
-* `./bin/powershell.exe`
+* `./bin/pwsh.exe`

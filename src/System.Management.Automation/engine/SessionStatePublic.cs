@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections.Generic;
 using System.Management.Automation.Runspaces;
@@ -70,7 +69,6 @@ namespace System.Management.Automation
 
             _sessionState.PublicSessionState = this;
         } // SessionState
-
 
         /// <summary>
         /// Construct a new session state object...
@@ -208,9 +206,7 @@ namespace System.Management.Automation
                 CommandInfo cinfo = valueToCheck as CommandInfo;
                 if (cinfo != null)
                 {
-                    string commandName = null;
-                    if (cinfo != null)
-                        commandName = cinfo.Name;
+                    string commandName = cinfo.Name;
                     if (commandName != null)
                     {
                         // If we have a name, use it in the error message

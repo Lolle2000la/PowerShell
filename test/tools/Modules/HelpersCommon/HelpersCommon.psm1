@@ -1,3 +1,5 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
 function Wait-UntilTrue
 {
     [CmdletBinding()]
@@ -81,4 +83,59 @@ function ShouldBeErrorId
 function Get-RandomFileName
 {
     [System.IO.Path]::GetFileNameWithoutExtension([IO.Path]::GetRandomFileName())
+}
+
+#
+# Testhook setting functions
+# note these manipulate private data in the PowerShell engine which will
+# enable us to not actually alter the system or mock returned data
+#
+$SCRIPT:TesthookType = [system.management.automation.internal.internaltesthooks] 
+function Test-TesthookIsSet
+{
+    param (
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory=$true)]
+        $testhookName
+    )
+    try {
+        return ${Script:TesthookType}.GetField($testhookName, "NonPublic,Static").GetValue($null)
+    }
+    catch {
+        # fall through
+    }
+    return $false
+}
+
+function Enable-Testhook
+{
+    param (
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory=$true)]
+        $testhookName
+    )
+    ${Script:TesthookType}::SetTestHook($testhookName, $true)
+}
+
+function Disable-Testhook
+{
+    param (
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory=$true)]
+        $testhookName
+    )
+    ${Script:TesthookType}::SetTestHook($testhookName, $false)
+}
+
+function Set-TesthookResult
+{
+    param (
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory=$true)]
+        $testhookName, 
+        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory=$true)]
+        $value
+    )
+    ${Script:TesthookType}::SetTestHook($testhookName, $value)
 }

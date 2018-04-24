@@ -1,30 +1,26 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
-
-#region Using directives
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Internal;
 using System.Reflection;
+using System.Security;
 using System.Text;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using System.IO;
 using Microsoft.CodeAnalysis.Emit;
-using System.Collections.Immutable;
-using System.Security;
-using PathType = System.IO.Path;
 
-#endregion
+using PathType = System.IO.Path;
 
 namespace Microsoft.PowerShell.Commands
 {
@@ -35,73 +31,33 @@ namespace Microsoft.PowerShell.Commands
     public enum Language
     {
         /// <summary>
-        /// The C# programming language: latest version.
+        /// The C# programming language.
         /// </summary>
         CSharp,
 
         /// <summary>
-        /// The C# programming language v7
+        /// The Visual Basic programming language.
         /// </summary>
-        CSharpVersion7,
-
-        /// <summary>
-        /// The C# programming language v6
-        /// </summary>
-        CSharpVersion6,
-
-        /// <summary>
-        /// The C# programming language v5
-        /// </summary>
-        CSharpVersion5,
-
-        /// <summary>
-        /// The C# programming language v4
-        /// </summary>
-        CSharpVersion4,
-
-        /// <summary>
-        /// The C# programming language v3 (for Linq, etc)
-        /// </summary>
-        CSharpVersion3,
-
-        /// <summary>
-        /// The C# programming language v2
-        /// </summary>
-        CSharpVersion2,
-
-        /// <summary>
-        /// The C# programming language v1
-        /// </summary>
-        CSharpVersion1,
-
-        /// <summary>
-        /// The Visual Basic programming language
-        /// </summary>
-        VisualBasic,
-
-        /// <summary>
-        /// The Managed JScript programming language
-        /// </summary>
-        JScript,
+        VisualBasic
     }
 
     /// <summary>
-    /// Types supported for the OutputAssembly parameter
+    /// Types supported for the OutputAssembly parameter.
     /// </summary>
     public enum OutputAssemblyType
     {
         /// <summary>
-        /// A Dynamically linked library (DLL)
+        /// A Dynamically linked library (DLL).
         /// </summary>
         Library,
 
         /// <summary>
-        /// An executable application that targets the console subsystem
+        /// An executable application that targets the console subsystem.
         /// </summary>
         ConsoleApplication,
 
         /// <summary>
-        /// An executable application that targets the graphical subsystem
+        /// An executable application that targets the graphical subsystem.
         /// </summary>
         WindowsApplication
     }
@@ -143,14 +99,17 @@ namespace Microsoft.PowerShell.Commands
     }
 
     /// <summary>
-    /// Base class that contains logic for Add-Type cmdlet based on
-    /// - CodeDomProvider
-    /// - CodeAnalysis(Roslyn)
+    /// Adds a new type to the Application Domain.
+    /// This version is based on CodeAnalysis (Roslyn).
     /// </summary>
-    public abstract class AddTypeCommandBase : PSCmdlet
+    [Cmdlet(VerbsCommon.Add, "Type", DefaultParameterSetName = "FromSource", HelpUri = "https://go.microsoft.com/fwlink/?LinkID=135195")]
+    [OutputType(typeof(Type))]
+    public sealed class AddTypeCommand : PSCmdlet
     {
+        #region Parameters
+
         /// <summary>
-        /// The source code of this type
+        /// The source code of this type.
         /// </summary>
         [Parameter(Mandatory = true, Position = 0, ParameterSetName = "FromSource")]
         public String TypeDefinition
@@ -166,13 +125,13 @@ namespace Microsoft.PowerShell.Commands
         }
 
         /// <summary>
-        /// The name of the type used for auto-generated types
+        /// The name of the type used for auto-generated types.
         /// </summary>
         [Parameter(Mandatory = true, Position = 0, ParameterSetName = "FromMember")]
         public String Name { get; set; }
 
         /// <summary>
-        /// The source code of this method / member
+        /// The source code of this method / member.
         /// </summary>
         [Parameter(Mandatory = true, Position = 1, ParameterSetName = "FromMember")]
         [SuppressMessage("Microsoft.Performance", "CA1819:PropertiesShouldNotReturnArrays")]
@@ -188,19 +147,15 @@ namespace Microsoft.PowerShell.Commands
 
                 if (value != null)
                 {
-                    for (int counter = 0; counter < value.Length; counter++)
-                    {
-                        sourceCode += value[counter] + "\n";
-                    }
+                    sourceCode = String.Join("\n", value);
                 }
             }
         }
 
         internal String sourceCode;
 
-
         /// <summary>
-        /// The namespaced used for the auto-generated type
+        /// The namespaced used for the auto-generated type.
         /// </summary>
         [Parameter(ParameterSetName = "FromMember")]
         [Alias("NS")]
@@ -213,26 +168,22 @@ namespace Microsoft.PowerShell.Commands
             }
             set
             {
-                typeNamespace = value;
-                if (typeNamespace != null)
-                {
-                    typeNamespace = typeNamespace.Trim();
-                }
+                typeNamespace = value?.Trim();
             }
         }
+
         internal string typeNamespace = "Microsoft.PowerShell.Commands.AddType.AutoGeneratedTypes";
 
         /// <summary>
-        /// Any using statements required by the auto-generated type
+        /// Any using statements required by the auto-generated type.
         /// </summary>
         [Parameter(ParameterSetName = "FromMember")]
         [Alias("Using")]
         [SuppressMessage("Microsoft.Performance", "CA1819:PropertiesShouldNotReturnArrays")]
         public String[] UsingNamespace { get; set; } = Utils.EmptyArray<string>();
 
-
         /// <summary>
-        /// The path to the source code or DLL to load
+        /// The path to the source code or DLL to load.
         /// </summary>
         [Parameter(Mandatory = true, Position = 0, ParameterSetName = "FromPath")]
         [SuppressMessage("Microsoft.Performance", "CA1819:PropertiesShouldNotReturnArrays")]
@@ -278,7 +229,7 @@ namespace Microsoft.PowerShell.Commands
         }
 
         /// <summary>
-        /// The literal path to the source code or DLL to load
+        /// The literal path to the source code or DLL to load.
         /// </summary>
         [Parameter(Mandatory = true, ParameterSetName = "FromLiteralPath")]
         [Alias("PSPath")]
@@ -331,10 +282,6 @@ namespace Microsoft.PowerShell.Commands
                         Language = Language.VisualBasic;
                         break;
 
-                    case ".JS":
-                        Language = Language.JScript;
-                        break;
-
                     case ".DLL":
                         loadAssembly = true;
                         break;
@@ -377,7 +324,7 @@ namespace Microsoft.PowerShell.Commands
         internal string[] paths;
 
         /// <summary>
-        /// The name of the assembly to load
+        /// The name of the assembly to load.
         /// </summary>
         [Parameter(Mandatory = true, ParameterSetName = "FromAssemblyName")]
         [Alias("AN")]
@@ -396,45 +343,17 @@ namespace Microsoft.PowerShell.Commands
         }
 
         internal String[] assemblyNames;
-
         internal bool loadAssembly = false;
 
-
         /// <summary>
-        /// The language used to generate source code
+        /// The language used to generate source code.
         /// </summary>
         [Parameter(ParameterSetName = "FromSource")]
         [Parameter(ParameterSetName = "FromMember")]
-        public Language Language
-        {
-            get
-            {
-                return language;
-            }
-            set
-            {
-                language = value;
-                languageSpecified = true;
-
-                PostSetLanguage(language);
-            }
-        }
+        public Language Language { get; set; } = Language.CSharp;
 
         /// <summary>
-        /// Post-action for Language setter.
-        /// </summary>
-        /// <param name="language"></param>
-        internal virtual void PostSetLanguage(Language language)
-        {
-        }
-
-
-        internal bool languageSpecified = false;
-        internal Language language = Language.CSharp;
-
-
-        /// <summary>
-        /// Any reference DLLs to use in the compilation
+        /// Any reference DLLs to use in the compilation.
         /// </summary>
         [Parameter(ParameterSetName = "FromSource")]
         [Parameter(ParameterSetName = "FromMember")]
@@ -453,7 +372,7 @@ namespace Microsoft.PowerShell.Commands
         internal string[] referencedAssemblies = Utils.EmptyArray<string>();
 
         /// <summary>
-        /// The path to the output assembly
+        /// The path to the output assembly.
         /// </summary>
         [Parameter(ParameterSetName = "FromSource")]
         [Parameter(ParameterSetName = "FromMember")]
@@ -533,7 +452,7 @@ namespace Microsoft.PowerShell.Commands
         internal string outputAssembly = null;
 
         /// <summary>
-        /// The output type of the assembly
+        /// The output type of the assembly.
         /// </summary>
         [Parameter(ParameterSetName = "FromSource")]
         [Parameter(ParameterSetName = "FromMember")]
@@ -555,42 +474,21 @@ namespace Microsoft.PowerShell.Commands
         internal OutputAssemblyType outputType = OutputAssemblyType.Library;
         internal bool outputTypeSpecified = false;
 
-
         /// <summary>
-        /// Flag to pass the resulting types along
+        /// Flag to pass the resulting types along.
         /// </summary>
         [Parameter()]
-        public SwitchParameter PassThru
-        {
-            get
-            {
-                return passThru;
-            }
-            set
-            {
-                passThru = value;
-            }
-        }
-        internal SwitchParameter passThru;
+        public SwitchParameter PassThru { get; set; }
 
         /// <summary>
-        /// Flag to ignore warnings during compilation
+        /// Flag to ignore warnings during compilation.
         /// </summary>
         [Parameter()]
-        public SwitchParameter IgnoreWarnings
-        {
-            get
-            {
-                return ignoreWarnings;
-            }
-            set
-            {
-                ignoreWarnings = value;
-                ignoreWarningsSpecified = true;
-            }
-        }
-        internal bool ignoreWarningsSpecified;
-        internal SwitchParameter ignoreWarnings;
+        public SwitchParameter IgnoreWarnings { get; set; }
+
+        #endregion Parameters
+
+        #region GererateSource
 
         internal string GenerateTypeSource(string typeNamespace, string name, string sourceCode, Language language)
         {
@@ -614,38 +512,17 @@ namespace Microsoft.PowerShell.Commands
             }
         }
 
-        internal bool IsCSharp(Language language)
+        // Get the -FromMember template for a given language
+        private string GetMethodTemplate(Language language)
         {
             switch (language)
             {
                 case Language.CSharp:
-                case Language.CSharpVersion2:
-                case Language.CSharpVersion3:
-                case Language.CSharpVersion1:
-                case Language.CSharpVersion4:
-                case Language.CSharpVersion5:
-                case Language.CSharpVersion6:
-                case Language.CSharpVersion7:
-                    return true;
-                default:
-                    return false;
-            }
-        }
-
-        // Get the -FromMember template for a given language
-        internal string GetMethodTemplate(Language language)
-        {
-            if (IsCSharp(language))
-            {
-                return
-                    "    public class {0}\n" +
-                    "    {{\n" +
-                    "    {1}\n" +
-                    "    }}\n";
-            }
-
-            switch (language)
-            {
+                    return
+                        "    public class {0}\n" +
+                        "    {{\n" +
+                        "    {1}\n" +
+                        "    }}\n";
                 case Language.VisualBasic:
                     return
                         "    public Class {0}\n" +
@@ -653,163 +530,89 @@ namespace Microsoft.PowerShell.Commands
                         "    {1}\n" +
                         "    \n" +
                         "    End Class\n";
-                case Language.JScript:
-                    return
-                        "    public class {0}\n" +
-                        "    {{\n" +
-                        "    {1}\n" +
-                        "    }}\n";
             }
+
+            Diagnostics.Assert(false, "GetMethodTemplate: Unsupported language family.");
+
             return null;
         }
 
         // Get the -FromMember namespace template for a given language
-        internal string GetNamespaceTemplate(Language language)
+        private string GetNamespaceTemplate(Language language)
         {
-            if (IsCSharp(language))
-            {
-                return
-                    "namespace {0}\n" +
-                    "{{\n" +
-                    "{1}\n" +
-                    "}}\n";
-            }
-
             switch (language)
             {
+                case Language.CSharp:
+                    return
+                        "namespace {0}\n" +
+                        "{{\n" +
+                        "{1}\n" +
+                        "}}\n";
                 case Language.VisualBasic:
                     return
                         "Namespace {0}\n" +
                         "\n" +
                         "{1}\n" +
                         "End Namespace\n";
-                case Language.JScript:
-                    return
-                        "package {0}\n" +
-                        "{{\n" +
-                        "{1}\n" +
-                        "}}\n";
             }
+
+            Diagnostics.Assert(false, "GetNamespaceTemplate: Unsupported language family.");
+
             return null;
         }
 
         // Get the -FromMember namespace template for a given language
-        internal string GetUsingTemplate(Language language)
+        private string GetUsingTemplate(Language language)
         {
-            if (IsCSharp(language))
-            {
-                return
-                    "using System;\n" +
-                    "using System.Runtime.InteropServices;\n" +
-                    "{0}" +
-                    "\n";
-            }
-
             switch (language)
             {
+                case Language.CSharp:
+                    return
+                        "using System;\n" +
+                        "using System.Runtime.InteropServices;\n" +
+                        "{0}" +
+                        "\n";
                 case Language.VisualBasic:
                     return
                         "Imports System\n" +
                         "Imports System.Runtime.InteropServices\n" +
                         "{0}" +
                         "\n";
-                case Language.JScript:
-                    return
-                        "import System;\n" +
-                        "import System.Runtime.InteropServices;\n" +
-                        "{0}" +
-                        "\n";
             }
+
+            Diagnostics.Assert(false, "GetUsingTemplate: Unsupported language family.");
+
             return null;
         }
 
         // Generate the code for the using statements
-        internal string GetUsingSet(Language language)
+        private string GetUsingSet(Language language)
         {
             StringBuilder usingNamespaceSet = new StringBuilder();
-            if (IsCSharp(language))
-            {
-                foreach (string namespaceValue in UsingNamespace)
-                {
-                    usingNamespaceSet.Append("using " + namespaceValue + ";\n");
-                }
-            }
-            else
-            {
-                switch (language)
-                {
-                    case Language.VisualBasic:
-                        foreach (string namespaceValue in UsingNamespace)
-                        {
-                            usingNamespaceSet.Append("Imports " + namespaceValue + "\n");
-                        }
-                        break;
 
-                    case Language.JScript:
-                        foreach (string namespaceValue in UsingNamespace)
-                        {
-                            usingNamespaceSet.Append("import " + namespaceValue + ";\n");
-                        }
-                        break;
-                }
+            switch (language)
+            {
+                case Language.CSharp:
+                    foreach (string namespaceValue in UsingNamespace)
+                    {
+                        usingNamespaceSet.Append("using " + namespaceValue + ";\n");
+                    }
+                    break;
+                case Language.VisualBasic:
+                    foreach (string namespaceValue in UsingNamespace)
+                    {
+                        usingNamespaceSet.Append("Imports " + namespaceValue + "\n");
+                    }
+                    break;
+                default:
+                    Diagnostics.Assert(false, "GetUsingSet: Unsupported language family.");
+                    break;
             }
 
             return usingNamespaceSet.ToString();
         }
 
-        /// <summary>
-        /// Perform common error checks.
-        /// Populate source code.
-        /// </summary>
-        protected override void EndProcessing()
-        {
-            // Generate an error if they've specified an output
-            // assembly type without an output assembly
-            if (String.IsNullOrEmpty(outputAssembly) && outputTypeSpecified)
-            {
-                ErrorRecord errorRecord = new ErrorRecord(
-                    new Exception(
-                        String.Format(
-                            CultureInfo.CurrentCulture,
-                            AddTypeStrings.OutputTypeRequiresOutputAssembly)),
-                    "OUTPUTTYPE_REQUIRES_ASSEMBLY",
-                    ErrorCategory.InvalidArgument,
-                    outputType);
-
-                ThrowTerminatingError(errorRecord);
-                return;
-            }
-
-            PopulateSource();
-        }
-
-        internal void PopulateSource()
-        {
-            // Prevent code compilation in ConstrainedLanguage mode
-            if (SessionState.LanguageMode == PSLanguageMode.ConstrainedLanguage)
-            {
-                ThrowTerminatingError(
-                    new ErrorRecord(
-                        new PSNotSupportedException(AddTypeStrings.CannotDefineNewType), "CannotDefineNewType", ErrorCategory.PermissionDenied, null));
-            }
-
-            // Load the source if they want to load from a file
-            if (String.Equals(ParameterSetName, "FromPath", StringComparison.OrdinalIgnoreCase) ||
-                String.Equals(ParameterSetName, "FromLiteralPath", StringComparison.OrdinalIgnoreCase)
-                )
-            {
-                sourceCode = "";
-                foreach (string file in paths)
-                {
-                    sourceCode += System.IO.File.ReadAllText(file) + "\n";
-                }
-            }
-
-            if (String.Equals(ParameterSetName, "FromMember", StringComparison.OrdinalIgnoreCase))
-            {
-                sourceCode = GenerateTypeSource(typeNamespace, Name, sourceCode, language);
-            }
-        }
+        #endregion GererateSource
 
         internal void HandleCompilerErrors(AddTypeCompilerError[] compilerErrors)
         {
@@ -853,12 +656,12 @@ namespace Microsoft.PowerShell.Commands
             {
                 if (!String.IsNullOrEmpty(error.FileName))
                 {
-                    actualSource = System.IO.File.ReadAllText(error.FileName).Split(Utils.Separators.Newline);
+                    actualSource = System.IO.File.ReadAllLines(error.FileName);
                 }
             }
 
             string errorText = StringUtil.Format(AddTypeStrings.CompilationErrorFormat,
-                        error.FileName, error.Line, error.ErrorText) + "\n";
+                        error.FileName, error.Line, error.ErrorText) + Environment.NewLine;
 
             for (int lineNumber = error.Line - 1; lineNumber < error.Line + 2; lineNumber++)
             {
@@ -876,8 +679,8 @@ namespace Microsoft.PowerShell.Commands
 
                     lineText += actualSource[lineNumber - 1];
 
-                    errorText += "\n" + StringUtil.Format(AddTypeStrings.CompilationErrorFormat,
-                        error.FileName, lineNumber, lineText) + "\n";
+                    errorText += Environment.NewLine + StringUtil.Format(AddTypeStrings.CompilationErrorFormat,
+                        error.FileName, lineNumber, lineText) + Environment.NewLine;
                 }
             }
 
@@ -896,24 +699,38 @@ namespace Microsoft.PowerShell.Commands
                 WriteError(errorRecord);
             }
         }
-    }
 
-    /// <summary>
-    /// Adds a new type to the Application Domain.
-    /// This version is based on CodeAnalysis (Roslyn).
-    /// </summary>
-    [Cmdlet(VerbsCommon.Add, "Type", DefaultParameterSetName = "FromSource", HelpUri = "https://go.microsoft.com/fwlink/?LinkID=135195")]
-    [OutputType(typeof(Type))]
-    public sealed class AddTypeCommand : AddTypeCommandBase
-    {
         private static Dictionary<string, int> s_sourceCache = new Dictionary<string, int>();
 
         /// <summary>
-        /// Generate the type(s)
+        /// Generate the type(s).
         /// </summary>
         protected override void EndProcessing()
         {
-            base.EndProcessing();
+            // Prevent code compilation in ConstrainedLanguage mode
+            if (SessionState.LanguageMode == PSLanguageMode.ConstrainedLanguage)
+            {
+                ThrowTerminatingError(
+                    new ErrorRecord(
+                        new PSNotSupportedException(AddTypeStrings.CannotDefineNewType), "CannotDefineNewType", ErrorCategory.PermissionDenied, null));
+            }
+
+            // Generate an error if they've specified an output
+            // assembly type without an output assembly
+            if (String.IsNullOrEmpty(outputAssembly) && outputTypeSpecified)
+            {
+                ErrorRecord errorRecord = new ErrorRecord(
+                    new Exception(
+                        String.Format(
+                            CultureInfo.CurrentCulture,
+                            AddTypeStrings.OutputTypeRequiresOutputAssembly)),
+                    "OUTPUTTYPE_REQUIRES_ASSEMBLY",
+                    ErrorCategory.InvalidArgument,
+                    outputType);
+
+                ThrowTerminatingError(errorRecord);
+                return;
+            }
 
             if (loadAssembly)
             {
@@ -932,13 +749,35 @@ namespace Microsoft.PowerShell.Commands
             {
                 // Load the source if they want to load from a file
                 if (String.Equals(ParameterSetName, "FromPath", StringComparison.OrdinalIgnoreCase) ||
-                    String.Equals(ParameterSetName, "FromLiteralPath", StringComparison.OrdinalIgnoreCase))
+                    String.Equals(ParameterSetName, "FromLiteralPath", StringComparison.OrdinalIgnoreCase)
+                   )
                 {
-                    this.sourceCode = "";
-                    foreach (string file in paths)
+                    if (paths.Length == 1)
                     {
-                        this.sourceCode += System.IO.File.ReadAllText(file) + "\n";
+                        sourceCode = File.ReadAllText(paths[0]);
                     }
+                    else
+                    {
+
+                        // We replace 'ReadAllText' with 'StringBuilder' and 'ReadAllLines'
+                        // to avoide temporary LOH allocations.
+
+                        StringBuilder sb = new StringBuilder(8192);
+
+                        foreach (string file in paths)
+                        {
+                            foreach (string line in File.ReadAllLines(file))
+                            {
+                                sb.AppendLine(line);
+                            }
+                        }
+
+                        sourceCode = sb.ToString();
+                    }
+                }
+                else if (String.Equals(ParameterSetName, "FromMember", StringComparison.OrdinalIgnoreCase))
+                {
+                    sourceCode = GenerateTypeSource(typeNamespace, Name, sourceCode, Language);
                 }
 
                 CompileSourceToAssembly(this.sourceCode);
@@ -957,7 +796,7 @@ namespace Microsoft.PowerShell.Commands
                     assembly = Assembly.LoadFrom(ResolveAssemblyName(assemblyName, false));
                 }
 
-                if (passThru)
+                if (PassThru)
                 {
                     WriteTypes(assembly);
                 }
@@ -1039,7 +878,7 @@ namespace Microsoft.PowerShell.Commands
 
         /// <summary>
         /// Initialize the set of assembly names that should be ignored when they are specified in '-ReferencedAssemblies'.
-        ///   - System.Private.CoreLib.ni.dll - the runtim dll that contains most core/primitive types
+        ///   - System.Private.CoreLib.ni.dll - the runtime dll that contains most core/primitive types
         ///   - System.Private.Uri.dll - the runtime dll that contains 'System.Uri' and related types
         /// Referencing these runtime dlls may cause ambiguous type identity or other issues.
         ///   - System.Runtime.dll - the corresponding reference dll will be automatically included
@@ -1095,7 +934,7 @@ namespace Microsoft.PowerShell.Commands
             if (!assembly.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
             {
                 // It could be a short assembly name or a full assembly name, but we
-                // alwasy want the short name to find the corresponding assembly file.
+                // always want the short name to find the corresponding assembly file.
                 var assemblyName = new AssemblyName(assembly);
                 refAssemblyDll = assemblyName.Name + ".dll";
             }
@@ -1185,46 +1024,17 @@ namespace Microsoft.PowerShell.Commands
         private void CompileSourceToAssembly(string source)
         {
             CSharpParseOptions parseOptions;
-            if (IsCSharp(language))
+            if (Language == Language.CSharp)
             {
-                switch (language)
-                {
-                    case Language.CSharpVersion1:
-                        parseOptions = new CSharpParseOptions(LanguageVersion.CSharp1);
-                        break;
-                    case Language.CSharpVersion2:
-                        parseOptions = new CSharpParseOptions(LanguageVersion.CSharp2);
-                        break;
-                    case Language.CSharpVersion3:
-                        parseOptions = new CSharpParseOptions(LanguageVersion.CSharp3);
-                        break;
-                    case Language.CSharpVersion4:
-                        parseOptions = new CSharpParseOptions(LanguageVersion.CSharp4);
-                        break;
-                    case Language.CSharpVersion5:
-                        parseOptions = new CSharpParseOptions(LanguageVersion.CSharp5);
-                        break;
-                    case Language.CSharpVersion6:
-                        parseOptions = new CSharpParseOptions(LanguageVersion.CSharp6);
-                        break;
-                    case Language.CSharpVersion7:
-                        parseOptions = new CSharpParseOptions(LanguageVersion.CSharp7);
-                        break;
-                    case Language.CSharp:
-                        parseOptions = new CSharpParseOptions();
-                        break;
-                    default:
-                        parseOptions = null;
-                        break;
-                }
+                parseOptions = new CSharpParseOptions();
             }
             else
             {
                 ErrorRecord errorRecord = new ErrorRecord(
-                    new Exception(String.Format(CultureInfo.CurrentCulture, AddTypeStrings.SpecialNetVersionRequired, language.ToString(), string.Empty)),
+                    new Exception(String.Format(CultureInfo.CurrentCulture, AddTypeStrings.SpecialNetVersionRequired, Language.ToString(), string.Empty)),
                     "LANGUAGE_NOT_SUPPORTED",
                     ErrorCategory.InvalidArgument,
-                    language);
+                    Language);
 
                 ThrowTerminatingError(errorRecord);
                 parseOptions = null;
@@ -1271,7 +1081,7 @@ namespace Microsoft.PowerShell.Commands
                         ms.Seek(0, SeekOrigin.Begin);
                         Assembly assembly = Assembly.Load(ms.ToArray());
                         CheckTypesForDuplicates(assembly);
-                        if (passThru)
+                        if (PassThru)
                         {
                             WriteTypes(assembly);
                         }
@@ -1283,7 +1093,7 @@ namespace Microsoft.PowerShell.Commands
                 emitResult = compilation.Emit(outputAssembly);
                 if (emitResult.Success)
                 {
-                    if (passThru)
+                    if (PassThru)
                     {
                         Assembly assembly = Assembly.LoadFrom(outputAssembly);
                         CheckTypesForDuplicates(assembly);

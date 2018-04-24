@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 // ReSharper disable UnusedMember.Global
 // ReSharper disable RedundantCast
@@ -101,11 +100,6 @@ namespace System.Management.Automation
 
         internal static object[] Range(int lower, int upper)
         {
-            if (lower == upper)
-            {
-                return new object[] { lower };
-            }
-
             int absRange = Math.Abs(checked(upper - lower));
 
             object[] ra = new object[absRange + 1];
@@ -862,6 +856,30 @@ namespace System.Management.Automation
             char firstAsUpper = char.ToUpperInvariant(lhs);
             char secondAsUpper = char.ToUpperInvariant(rhs);
             return firstAsUpper != secondAsUpper ? Boxed.True : Boxed.False;
+        }
+
+        internal static object[] Range(char start, char end)
+        {
+            int lower = (int)start;
+            int upper = (int)end;
+
+            int absRange = Math.Abs(checked(upper - lower));
+
+            object[] ra = new object[absRange + 1];
+            if (lower > upper)
+            {
+                // 3 .. 1 => 3 2 1
+                for (int offset = 0; offset < ra.Length; offset++)
+                    ra[offset] = (char)lower--;
+            }
+            else
+            {
+                // 1 .. 3 => 1 2 3
+                for (int offset = 0; offset < ra.Length; offset++)
+                    ra[offset] = (char)lower++;
+            }
+
+            return ra;
         }
     }
 }

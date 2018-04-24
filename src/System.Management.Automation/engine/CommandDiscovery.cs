@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -138,13 +137,6 @@ namespace System.Management.Automation
 
             Context = context;
             discoveryTracer.ShowHeaders = false;
-
-            // Cache the ScriptInfo for the scripts defined in the RunspaceConfiguration
-
-            _cachedScriptInfo =
-                new Dictionary<string, ScriptInfo>(StringComparer.OrdinalIgnoreCase);
-
-            LoadScriptInfo();
         }
 
         private void AddCmdletToCache(CmdletConfigurationEntry entry)
@@ -274,28 +266,6 @@ namespace System.Management.Automation
             }
         }
 
-        private void LoadScriptInfo()
-        {
-            if (Context.RunspaceConfiguration != null)
-            {
-                foreach (ScriptConfigurationEntry entry in Context.RunspaceConfiguration.Scripts)
-                {
-                    try
-                    {
-                        _cachedScriptInfo.Add(entry.Name, new ScriptInfo(entry.Name, ScriptBlock.Create(Context, entry.Definition), Context));
-                    }
-                    catch (ArgumentException)
-                    {
-                        PSNotSupportedException notSupported =
-                            PSTraceSource.NewNotSupportedException(
-                                DiscoveryExceptions.DuplicateScriptName,
-                                entry.Name);
-
-                        throw notSupported;
-                    }
-                }
-            }
-        }
         #endregion ctor
 
         #region internal methods
@@ -330,82 +300,17 @@ namespace System.Management.Automation
         internal CommandProcessorBase LookupCommandProcessor(string commandName,
             CommandOrigin commandOrigin, bool? useLocalScope)
         {
-            CommandInfo commandInfo = null;
-#if false
-                if (tokenCache.ContainsKey (commandName))
-                {
-                    commandInfo = tokenCache[commandName];
-                }
-                else
-                {
-                    commandInfo = LookupCommandInfo (commandName);
+            CommandProcessorBase processor = null;
+            CommandInfo commandInfo = LookupCommandInfo(commandName, commandOrigin);
 
-                    if (commandInfo.CommandType == CommandTypes.Alias)
-                    {
-                        commandInfo = ((AliasInfo)commandInfo).ResolvedCommand;
-                    }
-
-                    tokenCache[commandName] = commandInfo;
-                }
-#else
-            commandInfo = LookupCommandInfo(commandName, commandOrigin);
-#endif
-            CommandProcessorBase processor = LookupCommandProcessor(commandInfo, commandOrigin, useLocalScope, null);
-
-            // commandInfo.Name might be different than commandName - restore the original invocation name
-            processor.Command.MyInvocation.InvocationName = commandName;
+            if (commandInfo != null)
+            {
+                processor = LookupCommandProcessor(commandInfo, commandOrigin, useLocalScope, null);
+                // commandInfo.Name might be different than commandName - restore the original invocation name
+                processor.Command.MyInvocation.InvocationName = commandName;
+            }
 
             return processor;
-        }
-
-        //Minishell ExternalScriptInfo scriptInfo
-
-        internal CommandProcessorBase CreateScriptProcessorForMiniShell(ExternalScriptInfo scriptInfo, bool useLocalScope, SessionStateInternal sessionState)
-        {
-            VerifyScriptRequirements(scriptInfo, Context);
-
-            if (String.IsNullOrEmpty(scriptInfo.RequiresApplicationID))
-            {
-                if (scriptInfo.RequiresPSSnapIns != null && scriptInfo.RequiresPSSnapIns.Any())
-                {
-                    Collection<string> requiresMissingPSSnapIns = GetPSSnapinNames(scriptInfo.RequiresPSSnapIns);
-
-                    ScriptRequiresException scriptRequiresException =
-                        new ScriptRequiresException(
-                            scriptInfo.Name,
-                            requiresMissingPSSnapIns,
-                            "ScriptRequiresMissingPSSnapIns",
-                            true);
-                    throw scriptRequiresException;
-                }
-
-                return CreateCommandProcessorForScript(scriptInfo, Context, useLocalScope, sessionState);
-            }
-            else
-            {
-                if (String.Equals(
-                       Context.ShellID,
-                       scriptInfo.RequiresApplicationID,
-                       StringComparison.OrdinalIgnoreCase))
-                {
-                    return CreateCommandProcessorForScript(scriptInfo, Context, useLocalScope, sessionState);
-                }
-                else
-                {
-                    // Throw a runtime exception
-
-                    string shellPath = GetShellPathFromRegistry(scriptInfo.RequiresApplicationID);
-
-                    ScriptRequiresException sre =
-                        new ScriptRequiresException(
-                            scriptInfo.Name,
-                            scriptInfo.RequiresApplicationID,
-                            shellPath,
-                            "ScriptRequiresUnmatchedShellId");
-
-                    throw sre;
-                }
-            }
         }
 
         internal static void VerifyRequiredModules(ExternalScriptInfo scriptInfo, ExecutionContext context)
@@ -492,33 +397,12 @@ namespace System.Management.Automation
         private static void VerifyRequiredSnapins(IEnumerable<PSSnapInSpecification> requiresPSSnapIns, ExecutionContext context, out Collection<string> requiresMissingPSSnapIns)
         {
             requiresMissingPSSnapIns = null;
-            bool isHostedWithInitialSessionState = false;
-            RunspaceConfigForSingleShell rs = null;
-            if (context.InitialSessionState != null)
-            {
-                isHostedWithInitialSessionState = true;
-            }
-            else if (context.RunspaceConfiguration != null)
-            {
-                rs = context.RunspaceConfiguration as RunspaceConfigForSingleShell;
-                Dbg.Assert(rs != null, "RunspaceConfiguration should not be null");
-            }
-            else
-            {
-                Dbg.Assert(false, "PowerShell should be hosted with either InitialSessionState or RunspaceConfiguration");
-            }
+            Dbg.Assert(context.InitialSessionState != null, "PowerShell should be hosted with InitialSessionState");
 
             foreach (var requiresPSSnapIn in requiresPSSnapIns)
             {
                 IEnumerable<PSSnapInInfo> loadedPSSnapIns = null;
-                if (isHostedWithInitialSessionState)
-                {
-                    loadedPSSnapIns = context.InitialSessionState.GetPSSnapIn(requiresPSSnapIn.Name);
-                }
-                else
-                {
-                    loadedPSSnapIns = rs.ConsoleInfo.GetPSSnapIn(requiresPSSnapIn.Name, false);
-                }
+                loadedPSSnapIns = context.InitialSessionState.GetPSSnapIn(requiresPSSnapIn.Name);
                 if (loadedPSSnapIns == null || loadedPSSnapIns.Count() == 0)
                 {
                     if (requiresMissingPSSnapIns == null)
@@ -630,7 +514,6 @@ namespace System.Management.Automation
             }
         }
 
-
         #region comment out RequiresNetFrameworkVersion feature 8/10/2010
         /*
          * The "#requires -NetFrameworkVersion" feature is CUT OFF.
@@ -656,7 +539,6 @@ namespace System.Management.Automation
         }
         */
         #endregion
-
 
         /// <summary>
         /// used to determine compatibility between the versions in the requires statement and
@@ -758,16 +640,7 @@ namespace System.Management.Automation
                     scriptInfo.SignatureChecked = true;
                     try
                     {
-                        if (!Context.IsSingleShell)
-                        {
-                            // in minishell mode
-                            processor = CreateScriptProcessorForMiniShell(scriptInfo, useLocalScope ?? true, sessionState);
-                        }
-                        else
-                        {
-                            // single shell mode
-                            processor = CreateScriptProcessorForSingleShell(scriptInfo, Context, useLocalScope ?? true, sessionState);
-                        }
+                        processor = CreateScriptProcessorForSingleShell(scriptInfo, Context, useLocalScope ?? true, sessionState);
                     }
                     catch (ScriptRequiresSyntaxException reqSyntaxException)
                     {
@@ -1132,7 +1005,6 @@ namespace System.Management.Automation
             return matchingModules;
         }
 
-
         private static CommandInfo InvokeCommandNotFoundHandler(string commandName, ExecutionContext context, string originalCommandName, CommandOrigin commandOrigin)
         {
             CommandInfo result = null;
@@ -1469,7 +1341,6 @@ namespace System.Management.Automation
         private HashSet<string> _activeCommandNotFound = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private HashSet<string> _activePostCommand = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-
         /// <summary>
         /// Gets a CommandPathSearch constructed with the specified patterns and
         /// using the PATH as the lookup directories
@@ -1636,7 +1507,6 @@ namespace System.Management.Automation
         private static string[] s_cachedPathExtCollection;
         private static string[] s_cachedPathExtCollectionWithPs1;
 
-
         /// <summary>
         /// Gets the cmdlet information for the specified name.
         /// </summary>
@@ -1724,51 +1594,6 @@ namespace System.Management.Automation
             }
         } // GetCmdletInfo
 
-        private bool _cmdletCacheInitialized = false;
-
-        /// <summary>
-        /// Called by the RunspaceConfiguration when a PSSnapIn gets added to the
-        /// console to update the list of available cmdlets.
-        /// </summary>
-        ///
-        internal void UpdateCmdletCache()
-        {
-            if (!_cmdletCacheInitialized)
-            {
-                foreach (CmdletConfigurationEntry entry in Context.RunspaceConfiguration.Cmdlets)
-                {
-                    AddCmdletToCache(entry);
-                }
-
-                _cmdletCacheInitialized = true;
-
-                return;
-            }
-
-            foreach (CmdletConfigurationEntry entry in Context.RunspaceConfiguration.Cmdlets.UpdateList)
-            {
-                if (entry == null)
-                {
-                    continue;
-                }
-
-                switch (entry.Action)
-                {
-                    case UpdateAction.Add:
-                        AddCmdletToCache(entry);
-                        break;
-
-                    case UpdateAction.Remove:
-                        RemoveCmdletFromCache(entry);
-                        break;
-
-                    default:
-                        break;
-                }
-            }
-        } // UpdateCmdletCache
-
-
         /// <summary>
         /// Removes a cmdlet from the cmdlet cache.
         /// </summary>
@@ -1814,100 +1639,7 @@ namespace System.Management.Automation
             return removalIndex;
         }
 
-
-        /// <summary>
-        /// Gets the cached ScriptInfo for a command using the script name.
-        /// </summary>
-        ///
-        /// <param name="name">
-        /// The name of the script.
-        /// </param>
-        ///
-        /// <returns>
-        /// A reference to the ScriptInfo for the command if its in the cache,
-        /// or null otherwise.
-        /// </returns>
-        ///
-        internal ScriptInfo GetScriptInfo(string name)
-        {
-            Dbg.Assert(
-                !String.IsNullOrEmpty(name),
-                "The caller should verify the name");
-
-            ScriptInfo result;
-            _cachedScriptInfo.TryGetValue(name, out result);
-            return result;
-        } // GetScriptInfo
-
-        /// <summary>
-        /// Gets the script cache
-        /// </summary>
-        ///
-        internal Dictionary<string, ScriptInfo> ScriptCache
-        {
-            get { return _cachedScriptInfo; }
-        }
-
-        /// <summary>
-        /// The cache for the ScriptInfo.
-        /// </summary>
-        ///
-        private Dictionary<string, ScriptInfo> _cachedScriptInfo;
-
         internal ExecutionContext Context { get; }
-
-        /// <summary>
-        /// Reads the path for the appropriate shellID from the registry.
-        /// </summary>
-        ///
-        /// <param name="shellID">
-        /// The ID of the shell to retrieve the path for.
-        /// </param>
-        ///
-        /// <returns>
-        /// The path to the shell represented by the shellID.
-        /// </returns>
-        ///
-        /// <remarks>
-        /// The shellID must be registered in the Windows Registry in either
-        /// the HKEY_CURRENT_USER or HKEY_LOCAL_MACHINE hive under
-        /// Software/Microsoft/MSH/&lt;ShellID&gt; and are searched in that order.
-        /// </remarks>
-        ///
-        internal static string GetShellPathFromRegistry(string shellID)
-        {
-            string result = null;
-
-#if !UNIX
-            try
-            {
-                RegistryKey shellKey = Registry.LocalMachine.OpenSubKey(Utils.GetRegistryConfigurationPath(shellID));
-                if (shellKey != null)
-                {
-                    // verify the value kind as a string
-                    RegistryValueKind kind = shellKey.GetValueKind("path");
-
-                    if (kind == RegistryValueKind.ExpandString ||
-                        kind == RegistryValueKind.String)
-                    {
-                        result = shellKey.GetValue("path") as string;
-                    }
-                }
-            }
-            // Ignore these exceptions and return an empty or null result
-            catch (SecurityException)
-            {
-            }
-            catch (IOException)
-            {
-            }
-            catch (ArgumentException)
-            {
-            }
-#endif
-
-            return result;
-        }
 
         internal static PSModuleAutoLoadingPreference GetCommandDiscoveryPreference(ExecutionContext context, VariablePath variablePath, string environmentVariable)
         {
@@ -2130,5 +1862,4 @@ namespace System.Management.Automation
         public void ModuleManifestAnalysisException(string ModulePath, string Exception) { WriteEvent(12, ModulePath, Exception); }
     }
 }
-
 

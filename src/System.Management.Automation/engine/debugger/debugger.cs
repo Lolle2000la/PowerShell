@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections;
 using System.Diagnostics;
@@ -411,7 +410,7 @@ namespace System.Management.Automation
         public event EventHandler<ProcessRunspaceDebugEndEventArgs> RunspaceDebugProcessingCompleted;
 
         /// <summary>
-        /// Event raised to indicate that the debugging session is over and runspace debuggers queued for 
+        /// Event raised to indicate that the debugging session is over and runspace debuggers queued for
         /// processing should be released.
         /// </summary>
         public event EventHandler<EventArgs> CancelRunspaceDebugProcessing;
@@ -3403,7 +3402,7 @@ namespace System.Management.Automation
                          (command.Commands[0].CommandText.IndexOf(".EnterNestedPrompt()", StringComparison.OrdinalIgnoreCase) > 0))
                 {
                     // Prevent a host EnterNestedPrompt() call from occuring in an active debugger.
-                    // Host nested prompt makes no sense in this case and can cause hangs depending on host implementation.
+                    // Host nested prompt makes no sense in this case and can cause host to stop responding depending on host implementation.
                     throw new PSNotSupportedException();
                 }
 

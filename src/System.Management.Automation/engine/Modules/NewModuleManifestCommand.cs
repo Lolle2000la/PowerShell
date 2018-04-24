@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 using System.Linq;
@@ -288,7 +287,7 @@ namespace Microsoft.PowerShell.Commands
         private string[] _miscFiles;
 
         /// <summary>
-        /// List of other modules included with this module. 
+        /// List of other modules included with this module.
         /// Like the RequiredModules key, this list can be a simple list of module names or a complex list of module hashtables.
         /// </summary>
         [Parameter]
@@ -462,7 +461,7 @@ namespace Microsoft.PowerShell.Commands
         private bool _passThru;
 
         /// <summary>
-        /// Specify the Default Command Prefix 
+        /// Specify the Default Command Prefix
         /// </summary>
         [Parameter]
         [AllowNull]
@@ -855,7 +854,7 @@ namespace Microsoft.PowerShell.Commands
         protected override void EndProcessing()
         {
             // Win8: 264471 - Error message for New-ModuleManifest -ProcessorArchitecture is obsolete.
-            // If an undefined value is passed for the ProcessorArchitecture parameter, the error message from parameter binder includes all the values from the enum. 
+            // If an undefined value is passed for the ProcessorArchitecture parameter, the error message from parameter binder includes all the values from the enum.
             // The value 'IA64' for ProcessorArchitecture is not supported. But since we do not own the enum System.Reflection.ProcessorArchitecture, we cannot control the values in it.
             // So, we add a separate check in our code to give an error if user specifies IA64
             if (ProcessorArchitecture == ProcessorArchitecture.IA64)
@@ -939,21 +938,17 @@ namespace Microsoft.PowerShell.Commands
 
                 // Now open the output file...
                 PathUtils.MasterStreamOpen(
-                    this,
-                    filePath,
-#if UNIX
-                    new UTF8Encoding(false), // UTF-8, no BOM
-#else
-                    EncodingConversion.Unicode, // UTF-16 with BOM
-#endif
-                    /* defaultEncoding */ false,
-                    /* Append */ false,
-                    /* Force */ false,
-                    /* NoClobber */ false,
-                    out fileStream,
-                    out streamWriter,
-                    out readOnlyFileInfo,
-                    false
+                    cmdlet : this,
+                    filePath : filePath,
+                    resolvedEncoding : new UTF8Encoding(encoderShouldEmitUTF8Identifier : false),
+                    defaultEncoding : false,
+                    Append : false,
+                    Force : false,
+                    NoClobber : false,
+                    fileStream : out fileStream,
+                    streamWriter : out streamWriter,
+                    readOnlyFileInfo : out readOnlyFileInfo,
+                    isLiteralPath : false
                 );
 
                 try
@@ -1086,9 +1081,9 @@ namespace Microsoft.PowerShell.Commands
         // # ReleaseNotes of this module
         // ReleaseNotes = ''
         // }# end of PSData hashtable
-        // 
+        //
         // # User's private data keys
-        // 
+        //
         // }# end of PrivateData hashtable
         // #>
         private void BuildPrivateDataInModuleManifest(StringBuilder result, StreamWriter streamWriter)

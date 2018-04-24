@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections;
 using System.Collections.Concurrent;
@@ -72,10 +71,6 @@ namespace System.Management.Automation
                 else if (extension.Equals(StringLiterals.PowerShellCmdletizationFileExtension, StringComparison.OrdinalIgnoreCase))
                 {
                     result = AnalyzeCdxmlModule(modulePath, context, lastWriteTime);
-                }
-                else if (extension.Equals(StringLiterals.WorkflowFileExtension, StringComparison.OrdinalIgnoreCase))
-                {
-                    result = AnalyzeXamlModule(modulePath, context, lastWriteTime);
                 }
                 else if (extension.Equals(".dll", StringComparison.OrdinalIgnoreCase))
                 {
@@ -367,11 +362,6 @@ namespace System.Management.Automation
             return result;
         }
 
-        private static ConcurrentDictionary<string, CommandTypes> AnalyzeXamlModule(string modulePath, ExecutionContext context, DateTime lastWriteTime)
-        {
-            return AnalyzeTheOldWay(modulePath, context, lastWriteTime);
-        }
-
         private static ConcurrentDictionary<string, CommandTypes> AnalyzeCdxmlModule(string modulePath, ExecutionContext context, DateTime lastWriteTime)
         {
             return AnalyzeTheOldWay(modulePath, context, lastWriteTime);
@@ -634,14 +624,14 @@ namespace System.Management.Automation
                     // Wait a while before assuming we've finished the updates,
                     // writing the cache out in a timely matter isn't too important
                     // now anyway.
-                    await Task.Delay(10000);
+                    await Task.Delay(10000).ConfigureAwait(false);
                     int counter1, counter2;
                     do
                     {
                         // Check the counter a couple times with a delay,
                         // if it's stable, then proceed with writing.
                         counter1 = _saveCacheToDiskQueued;
-                        await Task.Delay(3000);
+                        await Task.Delay(3000).ConfigureAwait(false);
                         counter2 = _saveCacheToDiskQueued;
                     } while (counter1 != counter2);
                     Serialize(s_cacheStoreLocation);

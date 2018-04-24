@@ -1,5 +1,6 @@
-//! @file test-createsymlink.cpp
-//! @author George Fleming <v-geflem@microsoft.com>
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 //! @brief Implements test for CreateSymLink() and FollowSymLink()
 
 #include <gtest/gtest.h>
@@ -92,7 +93,7 @@ TEST_F(CreateSymLinkTest, SymLinkToFile)
     std::string target = FollowSymLink(fileSymLink.c_str());
     char buffer[PATH_MAX];
     std::string expected = realpath(file, buffer);
-    EXPECT_EQ(target, expected);
+    EXPECT_EQ(expected, target);
 }
 
 TEST_F(CreateSymLinkTest, SymLinkToDirectory)
@@ -103,7 +104,7 @@ TEST_F(CreateSymLinkTest, SymLinkToDirectory)
     std::string target = FollowSymLink(dirSymLink.c_str());
     char buffer[PATH_MAX];
     std::string expected = realpath(dir, buffer);
-    EXPECT_EQ(target, expected);
+    EXPECT_EQ(expected, target);
 }
 
 TEST_F(CreateSymLinkTest, SymLinkAgain)

@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 #if !SILVERLIGHT // ComObject
 #if !CLR2
@@ -66,7 +65,7 @@ namespace System.Management.Automation.ComInterop
     /// an instance of BoundDispEvent class. This class has InPlaceAdd and
     /// InPlaceSubtract operators defined. Calling InPlaceAdd operator will:
     /// 1. An instance of ComEventSinksContainer class is created (unless
-    /// RCW already had one). This instance is hanged off the RCW in attempt
+    /// RCW already had one). This instance is associated to the RCW in attempt
     /// to bind the lifetime of event sinks to the lifetime of the RCW itself,
     /// meaning event sink will be collected once the RCW is collected (this
     /// is the same way event sinks lifetime is controlled by PIAs).

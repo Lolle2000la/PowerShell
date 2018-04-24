@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 #pragma warning disable 1634, 1691
 
@@ -49,7 +48,6 @@ namespace System.Management.Automation
                 _currentWorkingDirectory = value;
             }
         } // CurrentLocation
-
 
         /// <summary>
         /// The current working directory for the virtual drive
@@ -804,18 +802,9 @@ namespace System.Management.Automation
             Object drive1Object = drive1;
             Object drive2Object = drive2;
 
-            if ((drive1Object == null))
+            if (drive1Object == null)
             {
-                if (drive2Object == null)
-                {
-                    // Since both drives are null, they are equal
-                    return false;
-                }
-                else
-                {
-                    // Since drive1 is null it is less than drive2 which is not null
-                    return true;
-                }
+                return (drive2Object != null);
             }
             else
             {
@@ -856,16 +845,9 @@ namespace System.Management.Automation
 
             if ((drive1Object == null))
             {
-                if (drive2Object == null)
-                {
-                    // Since both drives are null, they are equal
-                    return false;
-                }
-                else
-                {
-                    // Since drive1 is null it is less than drive2 which is not null
-                    return false;
-                }
+                // Since both drives are null, they are equal
+                // Since drive1 is null it is less than drive2 which is not null
+                return false;
             }
             else
             {

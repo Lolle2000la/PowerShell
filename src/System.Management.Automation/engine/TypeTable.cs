@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -1541,8 +1540,6 @@ namespace System.Management.Automation.Runspaces
             SetDefaultErrorRecord();
         }
 
-
-
         /// <summary>
         /// This constructor takes a localized message and an inner exception.
         /// </summary>
@@ -1987,7 +1984,6 @@ namespace System.Management.Automation.Runspaces
                 }
             }
         }
-
 
         // They are of NoteProperty
         private string _serializationMethod;
@@ -2531,7 +2527,6 @@ namespace System.Management.Automation.Runspaces
 
     #endregion TypeData
 
-
     /// <summary>
     /// A class that keeps the information from types.ps1xml files in a cache table
     /// </summary>
@@ -2747,7 +2742,6 @@ namespace System.Management.Automation.Runspaces
             member = null;
             return false;
         }
-
 
         /// <summary>
         /// Issue appropriate errors and remove members as necessary if:
@@ -3177,7 +3171,6 @@ namespace System.Management.Automation.Runspaces
             }
         }
 
-
         private void ProcessTypeDataToAdd(ConcurrentBag<string> errors, TypeData typeData)
         {
             string typeName = typeData.TypeName;
@@ -3558,7 +3551,6 @@ namespace System.Management.Automation.Runspaces
         {
             return PSObject.TransformMemberInfoCollection<PSMemberInfo, T>(GetMembers(types));
         }
-
 
         private PSMemberInfoInternalCollection<PSMemberInfo> GetMembers(ConsolidatedString types)
         {
@@ -4218,7 +4210,6 @@ namespace System.Management.Automation.Runspaces
 
             Update(errors, typeData, false);
             StandardMembersUpdated();
-
             // Throw exception if there are any errors
             FormatAndTypeDataHelper.ThrowExceptionOnError("ErrorsUpdatingTypes", errors, RunspaceConfigurationCategory.Types);
         }
@@ -4245,7 +4236,6 @@ namespace System.Management.Automation.Runspaces
 
             Update(errors, typeData, true);
             StandardMembersUpdated();
-
             // Throw exception if there are any errors
             FormatAndTypeDataHelper.ThrowExceptionOnError("ErrorsUpdatingTypes", errors, RunspaceConfigurationCategory.Types);
         }

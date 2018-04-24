@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 using System.Collections.Generic;
@@ -54,7 +53,6 @@ namespace Microsoft.PowerShell.Commands
         [Parameter(ParameterSetName = "UseCulture")]
         public SwitchParameter UseCulture { get; set; }
 
-
         /// <summary>
         /// Abstract Property - Input Object which is written in Csv format
         /// Derived as Different Attributes.In ConvertTo-CSV, This is a positional parameter. Export-CSV not a Positional behaviour.
@@ -67,26 +65,20 @@ namespace Microsoft.PowerShell.Commands
         }
 
         /// <summary>
-        /// NoTypeInformation : should the #TYPE line be generated
+        /// IncludeTypeInformation : The #TYPE line should be generated. Default is false. Cannot specify with NoTypeInformation.
         /// </summary>
         [Parameter]
+        [Alias("ITI")]
+        public SwitchParameter IncludeTypeInformation { get; set; }
+
+        /// <summary>
+        /// NoTypeInformation : The #TYPE line should not be generated. Default is true. Cannot specify with IncludeTypeInformation.
+        /// </summary>
+        [Parameter(DontShow = true)]
         [Alias("NTI")]
-        public SwitchParameter NoTypeInformation
-        {
-            get
-            {
-                return _noTypeInformation;
-            }
-            set
-            {
-                _noTypeInformation = value;
-            }
-        }
-        private bool _noTypeInformation;
+        public SwitchParameter NoTypeInformation { get; set; } = true;
 
         #endregion Command Line Parameters
-
-
 
         /// <summary>
         /// Write the string to a file or pipeline
@@ -100,6 +92,16 @@ namespace Microsoft.PowerShell.Commands
         /// </summary>
         protected override void BeginProcessing()
         {
+            if (this.MyInvocation.BoundParameters.ContainsKey(nameof(IncludeTypeInformation)) && this.MyInvocation.BoundParameters.ContainsKey(nameof(NoTypeInformation)))
+            {
+                InvalidOperationException exception = new InvalidOperationException(CsvCommandStrings.CannotSpecifyIncludeTypeInformationAndNoTypeInformation);
+                ErrorRecord errorRecord = new ErrorRecord(exception, "CannotSpecifyIncludeTypeInformationAndNoTypeInformation", ErrorCategory.InvalidData, null);
+                this.ThrowTerminatingError(errorRecord);
+            }
+            if (this.MyInvocation.BoundParameters.ContainsKey("IncludeTypeInformation"))
+            {
+                NoTypeInformation = !IncludeTypeInformation;
+            }
             _delimiter = ImportExportCSVHelper.SetDelimiter(this, ParameterSetName, _delimiter, UseCulture);
         }
     }
@@ -165,8 +167,6 @@ namespace Microsoft.PowerShell.Commands
         }
         private bool _isLiteralPath = false;
 
-
-
         /// <summary>
         /// Property that sets force parameter.
         /// </summary>
@@ -206,8 +206,20 @@ namespace Microsoft.PowerShell.Commands
         /// Encoding optional flag
         /// </summary>
         [Parameter()]
-        [ValidateSetAttribute(new string[] { "Unicode", "UTF7", "UTF8", "ASCII", "UTF32", "BigEndianUnicode", "Default", "OEM" })]
-        public string Encoding { get; set; }
+        [ArgumentToEncodingTransformationAttribute()]
+        [ArgumentCompletions(
+            EncodingConversion.Ascii,
+            EncodingConversion.BigEndianUnicode,
+            EncodingConversion.OEM,
+            EncodingConversion.Unicode,
+            EncodingConversion.Utf7,
+            EncodingConversion.Utf8,
+            EncodingConversion.Utf8Bom,
+            EncodingConversion.Utf8NoBom,
+            EncodingConversion.Utf32
+            )]
+        [ValidateNotNullOrEmpty]
+        public Encoding Encoding { get; set; } = ClrFacade.GetDefaultEncoding();
 
         /// <summary>
         /// Property that sets append parameter.
@@ -247,7 +259,6 @@ namespace Microsoft.PowerShell.Commands
 
             _helper = new ExportCsvHelper(this, base.Delimiter);
         }
-
 
         /// <summary>
         /// Convert the current input object to Csv and write to file/WriteObject
@@ -367,7 +378,7 @@ namespace Microsoft.PowerShell.Commands
                 PathUtils.MasterStreamOpen(
                     this,
                     this.Path,
-                    Encoding ?? "ASCII",
+                    Encoding,
                     false, // defaultEncoding
                     Append,
                     Force,
@@ -498,7 +509,6 @@ namespace Microsoft.PowerShell.Commands
         [ValidateNotNull]
         public char Delimiter { get; set; }
 
-
         /// <summary>
         /// mandatory file name to read from
         /// </summary>
@@ -558,7 +568,6 @@ namespace Microsoft.PowerShell.Commands
         }
         private bool _useculture;
 
-
         ///<summary>
         /// Header property to customize the names
         ///</summary>
@@ -571,8 +580,20 @@ namespace Microsoft.PowerShell.Commands
         /// Encoding optional flag
         /// </summary>
         [Parameter()]
-        [ValidateSetAttribute(new[] { "Unicode", "UTF7", "UTF8", "ASCII", "UTF32", "BigEndianUnicode", "Default", "OEM" })]
-        public string Encoding { get; set; }
+        [ArgumentToEncodingTransformationAttribute()]
+        [ArgumentCompletions(
+            EncodingConversion.Ascii,
+            EncodingConversion.BigEndianUnicode,
+            EncodingConversion.OEM,
+            EncodingConversion.Unicode,
+            EncodingConversion.Utf7,
+            EncodingConversion.Utf8,
+            EncodingConversion.Utf8Bom,
+            EncodingConversion.Utf8NoBom,
+            EncodingConversion.Utf32
+            )]
+        [ValidateNotNullOrEmpty]
+        public Encoding Encoding { get; set; } = ClrFacade.GetDefaultEncoding();
 
         /// <summary>
         /// Avoid writing out duplicate warning messages when there are
@@ -672,8 +693,6 @@ namespace Microsoft.PowerShell.Commands
             base.BeginProcessing();
             _helper = new ExportCsvHelper(this, base.Delimiter);
         }
-
-
 
         /// <summary>
         /// Convert the current input object to Csv and write to stream/WriteObject
@@ -866,7 +885,6 @@ namespace Microsoft.PowerShell.Commands
         }
 
         //Name of properties to be written in CSV format
-
 
         /// <summary>
         /// Get the name of properties from source PSObject and
@@ -1306,10 +1324,6 @@ namespace Microsoft.PowerShell.Commands
                     {
                         type = null;
                     }
-                    else
-                    {
-                        type = ImportExportCSVHelper.CSVTypePrefix + type;
-                    }
                 }
             }
             return type;
@@ -1336,7 +1350,6 @@ namespace Microsoft.PowerShell.Commands
             {
                 //Read the next character
                 char ch = ReadChar();
-
 
                 if ((ch == _delimiter))
                 {
@@ -1453,21 +1466,12 @@ namespace Microsoft.PowerShell.Commands
                             break;
                     }
                 }
-                else if (IsNewLine(ch))
+                else if (IsNewLine(ch, out string newLine))
                 {
-                    if (ch == '\r')
-                    {
-                        ReadChar();
-                    }
-
                     if (seenBeginQuote)
                     {
                         //newline inside quote are valid
-                        current.Append(ch);
-                        if (ch == '\r')
-                        {
-                            current.Append('\n');
-                        }
+                        current.Append(newLine);
                     }
                     else
                     {
@@ -1490,23 +1494,30 @@ namespace Microsoft.PowerShell.Commands
             return result;
         }
 
+        // If we detect a newline we return it as a string "\r", "\n" or "\r\n"
         private
         bool
-        IsNewLine(char ch)
+        IsNewLine(char ch, out string newLine)
         {
-            bool newLine = false;
-            if (ch == '\n')
-            {
-                newLine = true;
-            }
-            else if (ch == '\r')
+            newLine = "";
+            if (ch == '\r')
             {
                 if (PeekNextChar('\n'))
                 {
-                    newLine = true;
+                    ReadChar();
+                    newLine = "\r\n";
+                }
+                else
+                {
+                    newLine = "\r";
                 }
             }
-            return newLine;
+            else if (ch == '\n')
+            {
+                newLine = "\n";
+            }
+
+            return newLine != "";
         }
 
         /// <summary>
@@ -1544,13 +1555,9 @@ namespace Microsoft.PowerShell.Commands
                 {
                     break;
                 }
-                else if (IsNewLine(ch))
+                else if (IsNewLine(ch, out string newLine))
                 {
                     endOfRecord = true;
-                    if (ch == '\r')
-                    {
-                        ReadChar();
-                    }
                     break;
                 }
                 else
@@ -1582,11 +1589,6 @@ namespace Microsoft.PowerShell.Commands
             PSObject result = new PSObject();
             char delimiterlocal = delimiter;
             int unspecifiedNameIndex = 1;
-            if (type != null && type.Length > 0)
-            {
-                result.TypeNames.Clear();
-                result.TypeNames.Add(type);
-            }
             for (int i = 0; i <= names.Count - 1; i++)
             {
                 string name = names[i];
@@ -1612,6 +1614,13 @@ namespace Microsoft.PowerShell.Commands
             {
                 _cmdlet.WriteWarning(CsvCommandStrings.UseDefaultNameForUnspecifiedHeader);
                 _alreadyWarnedUnspecifiedName = true;
+            }
+
+            if (type != null && type.Length > 0)
+            {
+                result.TypeNames.Clear();
+                result.TypeNames.Add(type);
+                result.TypeNames.Add(ImportExportCSVHelper.CSVTypePrefix + type);
             }
 
             return result;

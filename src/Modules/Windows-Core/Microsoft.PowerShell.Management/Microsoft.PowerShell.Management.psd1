@@ -1,13 +1,13 @@
 @{
 GUID="EEFCB906-B326-4E99-9F54-8B4BB6EF3C6D"
-Author="Microsoft Corporation"
+Author="PowerShell"
 CompanyName="Microsoft Corporation"
-Copyright="(c) Microsoft Corporation. All rights reserved."
+Copyright="Copyright (c) Microsoft Corporation. All rights reserved."
 ModuleVersion="3.1.0.0"
 PowerShellVersion="3.0"
 NestedModules="Microsoft.PowerShell.Commands.Management.dll"
-HelpInfoURI = 'https://go.microsoft.com/fwlink/?linkid=390785'
-AliasesToExport = @("gin", "gtz", "stz") 
+HelpInfoURI = 'https://go.microsoft.com/fwlink/?linkid=855958'
+AliasesToExport = @("gin", "gtz", "stz")
 FunctionsToExport = @()
 CmdletsToExport=@("Add-Content",
     "Clear-Content",
@@ -40,6 +40,7 @@ CmdletsToExport=@("Add-Content",
     "New-ItemProperty",
     "Split-Path",
     "Test-Path",
+    "Test-Connection",
     "Get-Process",
     "Stop-Process",
     "Wait-Process",
@@ -59,7 +60,6 @@ CmdletsToExport=@("Add-Content",
     "Remove-Service",
     "Set-Content",
     "Set-ItemProperty",
-    "Test-Connection",
     "Restart-Computer",
     "Stop-Computer",
     "Rename-Computer",

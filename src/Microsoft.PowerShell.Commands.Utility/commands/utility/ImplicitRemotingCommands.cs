@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 using System.Collections;
@@ -77,19 +76,20 @@ namespace Microsoft.PowerShell.Commands
         /// Encoding optional flag
         /// </summary>
         [Parameter]
-        [ValidateSetAttribute(new string[] { "Unicode", "UTF7", "UTF8", "ASCII", "UTF32", "BigEndianUnicode", "Default", "OEM" })]
-        public string Encoding
-        {
-            get
-            {
-                return _encoding.GetType().Name;
-            }
-            set
-            {
-                _encoding = EncodingConversion.Convert(this, value);
-            }
-        }
-        private Encoding _encoding = System.Text.Encoding.UTF8;
+        [ArgumentToEncodingTransformationAttribute()]
+        [ArgumentCompletions(
+            EncodingConversion.Ascii,
+            EncodingConversion.BigEndianUnicode,
+            EncodingConversion.OEM,
+            EncodingConversion.Unicode,
+            EncodingConversion.Utf7,
+            EncodingConversion.Utf8,
+            EncodingConversion.Utf8Bom,
+            EncodingConversion.Utf8NoBom,
+            EncodingConversion.Utf32
+            )]
+        [ValidateNotNullOrEmpty]
+        public Encoding Encoding { get; set; } = ClrFacade.GetDefaultEncoding();
 
         #endregion Parameters
 
@@ -144,7 +144,7 @@ namespace Microsoft.PowerShell.Commands
             List<string> generatedFiles = GenerateProxyModule(
                 tempDirectory,
                 Path.GetFileName(directory.FullName),
-                _encoding,
+                Encoding,
                 _force,
                 listOfCommandMetadata,
                 alias2resolvedCommandName,
@@ -2052,7 +2052,6 @@ if ($script:__psImplicitRemoting_versionOfScriptGenerator.Major -ne {2})
 {{
     throw '{3}'
 }}
-
 
 $script:WriteHost = $executionContext.InvokeCommand.GetCommand('Write-Host', [System.Management.Automation.CommandTypes]::Cmdlet)
 $script:WriteWarning = $executionContext.InvokeCommand.GetCommand('Write-Warning', [System.Management.Automation.CommandTypes]::Cmdlet)

@@ -1,5 +1,6 @@
-//! @file followSymLink.cpp
-//! @author George FLeming <v-geflem@microsoft.com>
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 //! @brief returns whether a path is a symbolic link
 
 #include "followsymlink.h"
@@ -39,7 +40,7 @@ char* FollowSymLink(const char* fileName)
 
     if (realPath)
     {
-        return strndup(realPath, strlen(realPath) + 1);
+        return strndup(realPath, strnlen(realPath, PATH_MAX));
     }
 
     // if the path wasn't resolved, use readlink

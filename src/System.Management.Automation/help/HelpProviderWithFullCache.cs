@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Collections.Generic;
 
@@ -34,10 +33,7 @@ namespace System.Management.Automation
         /// <returns>The HelpInfo found. Null if nothing is found</returns>
         internal sealed override IEnumerable<HelpInfo> ExactMatchHelp(HelpRequest helpRequest)
         {
-            // If the current invocation is a singleshell based
-            // then we have to constantly update the cache as
-            // snapins might get added / removed.
-            if (!this.CacheFullyLoaded || AreSnapInsSupported())
+            if (!this.CacheFullyLoaded)
             {
                 LoadCache();
             }
@@ -69,10 +65,7 @@ namespace System.Management.Automation
         /// <returns>a collection of help info objects</returns>
         internal sealed override IEnumerable<HelpInfo> SearchHelp(HelpRequest helpRequest, bool searchOnlyContent)
         {
-            // If the current invocation is a singleshell based
-            // then we have to constantly update the cache as
-            // snapins might get added / removed.
-            if (!this.CacheFullyLoaded || AreSnapInsSupported())
+            if (!this.CacheFullyLoaded)
             {
                 LoadCache();
             }

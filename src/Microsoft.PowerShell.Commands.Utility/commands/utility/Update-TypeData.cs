@@ -1,6 +1,5 @@
-/********************************************************************++
-Copyright (c) Microsoft Corporation.  All rights reserved.
---********************************************************************/
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 using System;
 using System.Collections.Concurrent;
@@ -12,7 +11,6 @@ using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Management.Automation.Runspaces;
 using Dbg = System.Management.Automation.Diagnostics;
-
 
 namespace Microsoft.PowerShell.Commands
 {
@@ -129,7 +127,6 @@ namespace Microsoft.PowerShell.Commands
             get { return _serializationMethod; }
         }
 
-
         /// <summary>
         /// TargetTypeForDeserialization
         /// </summary>
@@ -140,7 +137,6 @@ namespace Microsoft.PowerShell.Commands
             set { _targetTypeForDeserialization = value; }
             get { return _targetTypeForDeserialization; }
         }
-
 
         /// <summary>
         /// SerializationDepth
@@ -154,7 +150,6 @@ namespace Microsoft.PowerShell.Commands
             get { return _serializationDepth; }
         }
 
-
         /// <summary>
         /// DefaultDisplayProperty
         /// </summary>
@@ -165,7 +160,6 @@ namespace Microsoft.PowerShell.Commands
             set { _defaultDisplayProperty = value; }
             get { return _defaultDisplayProperty; }
         }
-
 
         /// <summary>
         /// InheritPropertySerializationSet
@@ -178,7 +172,6 @@ namespace Microsoft.PowerShell.Commands
             get { return _inheritPropertySerializationSet; }
         }
 
-
         /// <summary>
         /// StringSerializationSource
         /// </summary>
@@ -189,7 +182,6 @@ namespace Microsoft.PowerShell.Commands
             set { _stringSerializationSource = value; }
             get { return _stringSerializationSource; }
         }
-
 
         /// <summary>
         /// DefaultDisplayPropertySet
@@ -214,7 +206,6 @@ namespace Microsoft.PowerShell.Commands
             set { _defaultKeyPropertySet = value; }
             get { return _defaultKeyPropertySet; }
         }
-
 
         /// <summary>
         /// PropertySerializationSet
@@ -366,17 +357,13 @@ namespace Microsoft.PowerShell.Commands
                         else
                         {
                             // Update successfully, we add the TypeData into cache
-                            if (Context.RunspaceConfiguration != null)
-                            {
-                                Context.RunspaceConfiguration.Types.Append(new TypeConfigurationEntry(type, false));
-                            }
-                            else if (Context.InitialSessionState != null)
+                            if (Context.InitialSessionState != null)
                             {
                                 Context.InitialSessionState.Types.Add(new SessionStateTypeEntry(type, false));
                             }
                             else
                             {
-                                Dbg.Assert(false, "Either RunspaceConfiguration or InitialSessionState must be non-null for Update-Typedata to work");
+                                Dbg.Assert(false, "InitialSessionState must be non-null for Update-Typedata to work");
                             }
                         }
                     }
@@ -484,17 +471,13 @@ namespace Microsoft.PowerShell.Commands
                     else
                     {
                         // Update successfully, we add the TypeData into cache
-                        if (Context.RunspaceConfiguration != null)
-                        {
-                            Context.RunspaceConfiguration.Types.Append(new TypeConfigurationEntry(type, false));
-                        }
-                        else if (Context.InitialSessionState != null)
+                        if (Context.InitialSessionState != null)
                         {
                             Context.InitialSessionState.Types.Add(new SessionStateTypeEntry(type, false));
                         }
                         else
                         {
-                            Dbg.Assert(false, "Either RunspaceConfiguration or InitialSessionState must be non-null for Update-Typedata to work");
+                            Dbg.Assert(false, "InitialSessionState must be non-null for Update-Typedata to work");
                         }
                     }
                 }
@@ -757,38 +740,7 @@ namespace Microsoft.PowerShell.Commands
             // filename is available
             string target = UpdateDataStrings.UpdateTarget;
 
-            if (Context.RunspaceConfiguration != null)
-            {
-                for (int i = prependPathTotal.Count - 1; i >= 0; i--)
-                {
-                    string formattedTarget = string.Format(CultureInfo.InvariantCulture, target, prependPathTotal[i]);
-
-                    if (ShouldProcess(formattedTarget, action))
-                    {
-                        this.Context.RunspaceConfiguration.Types.Prepend(new TypeConfigurationEntry(prependPathTotal[i]));
-                    }
-                }
-
-                foreach (string appendPathTotalItem in appendPathTotal)
-                {
-                    string formattedTarget = string.Format(CultureInfo.InvariantCulture, target, appendPathTotalItem);
-
-                    if (ShouldProcess(formattedTarget, action))
-                    {
-                        this.Context.RunspaceConfiguration.Types.Append(new TypeConfigurationEntry(appendPathTotalItem));
-                    }
-                }
-
-                try
-                {
-                    this.Context.CurrentRunspace.RunspaceConfiguration.Types.Update(true);
-                }
-                catch (RuntimeException e)
-                {
-                    this.WriteError(new ErrorRecord(e, "TypesXmlUpdateException", ErrorCategory.InvalidOperation, null));
-                }
-            }
-            else if (Context.InitialSessionState != null)
+            if (Context.InitialSessionState != null)
             {
                 // This hashSet is to detect if there are duplicate type files
                 var fullFileNameHash = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
@@ -887,7 +839,7 @@ namespace Microsoft.PowerShell.Commands
             }
             else
             {
-                Dbg.Assert(false, "Either RunspaceConfiguration or InitialSessionState must be non-null for Update-Typedata to work");
+                Dbg.Assert(false, "InitialSessionState must be non-null for Update-Typedata to work");
             }
         }
 
@@ -931,38 +883,7 @@ namespace Microsoft.PowerShell.Commands
             // filename is available
             string target = UpdateDataStrings.UpdateTarget;
 
-            if (Context.RunspaceConfiguration != null)
-            {
-                for (int i = prependPathTotal.Count - 1; i >= 0; i--)
-                {
-                    string formattedTarget = string.Format(CultureInfo.CurrentCulture, target, prependPathTotal[i]);
-
-                    if (ShouldProcess(formattedTarget, action))
-                    {
-                        this.Context.RunspaceConfiguration.Formats.Prepend(new FormatConfigurationEntry(prependPathTotal[i]));
-                    }
-                }
-
-                foreach (string appendPathTotalItem in appendPathTotal)
-                {
-                    string formattedTarget = string.Format(CultureInfo.CurrentCulture, target, appendPathTotalItem);
-
-                    if (ShouldProcess(formattedTarget, action))
-                    {
-                        this.Context.RunspaceConfiguration.Formats.Append(new FormatConfigurationEntry(appendPathTotalItem));
-                    }
-                }
-
-                try
-                {
-                    this.Context.CurrentRunspace.RunspaceConfiguration.Formats.Update(true);
-                }
-                catch (RuntimeException e)
-                {
-                    this.WriteError(new ErrorRecord(e, "FormatXmlUpdateException", ErrorCategory.InvalidOperation, null));
-                }
-            }
-            else if (Context.InitialSessionState != null)
+            if (Context.InitialSessionState != null)
             {
                 if (Context.InitialSessionState.DisableFormatUpdates)
                 {
@@ -1055,12 +976,11 @@ namespace Microsoft.PowerShell.Commands
                     if (entries.Count > 0)
                     {
                         Context.FormatDBManager.UpdateDataBase(entries, this.Context.AuthorizationManager, this.Context.EngineHostInterface, false);
-                        FormatAndTypeDataHelper.ThrowExceptionOnError(
-                                            "ErrorsUpdatingFormats",
-                                            null,
-                                            entries,
-                                            RunspaceConfigurationCategory.Formats);
-                    }
+                        FormatAndTypeDataHelper.ThrowExceptionOnError( "ErrorsUpdatingFormats",
+                            null,
+                            entries,
+                            RunspaceConfigurationCategory.Formats);
+                     }
                 }
                 catch (RuntimeException e)
                 {
@@ -1069,7 +989,7 @@ namespace Microsoft.PowerShell.Commands
             }
             else
             {
-                Dbg.Assert(false, "Either RunspaceConfiguration or InitialSessionState must be non-null for Update-FormatData to work");
+                Dbg.Assert(false, "InitialSessionState must be non-null for Update-FormatData to work");
             }
         }
     }
@@ -1154,17 +1074,7 @@ namespace Microsoft.PowerShell.Commands
                 Dictionary<string, List<int>> fileToIndexMap = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
                 List<int> indicesToRemove = new List<int>();
 
-                if (Context.RunspaceConfiguration != null)
-                {
-                    for (int index = 0; index < Context.RunspaceConfiguration.Types.Count; index++)
-                    {
-                        string fileName = Context.RunspaceConfiguration.Types[index].FileName;
-                        if (fileName == null) { continue; }
-
-                        ConstructFileToIndexMap(fileName, index, fileToIndexMap);
-                    }
-                }
-                else if (Context.InitialSessionState != null)
+                if (Context.InitialSessionState != null)
                 {
                     for (int index = 0; index < Context.InitialSessionState.Types.Count; index++)
                     {
@@ -1200,11 +1110,7 @@ namespace Microsoft.PowerShell.Commands
                     indicesToRemove.Sort();
                     for (int i = indicesToRemove.Count - 1; i >= 0; i--)
                     {
-                        if (Context.RunspaceConfiguration != null)
-                        {
-                            Context.RunspaceConfiguration.Types.RemoveItem(indicesToRemove[i]);
-                        }
-                        else if (Context.InitialSessionState != null)
+                        if (Context.InitialSessionState != null)
                         {
                             Context.InitialSessionState.Types.RemoveItem(indicesToRemove[i]);
                         }
@@ -1212,11 +1118,7 @@ namespace Microsoft.PowerShell.Commands
 
                     try
                     {
-                        if (Context.RunspaceConfiguration != null)
-                        {
-                            Context.RunspaceConfiguration.Types.Update();
-                        }
-                        else if (Context.InitialSessionState != null)
+                        if (Context.InitialSessionState != null)
                         {
                             bool oldRefreshTypeFormatSetting = Context.InitialSessionState.RefreshTypeAndFormatSetting;
                             try
@@ -1279,17 +1181,13 @@ namespace Microsoft.PowerShell.Commands
                     else
                     {
                         // Type is removed successfully, add it into the cache
-                        if (Context.RunspaceConfiguration != null)
-                        {
-                            Context.RunspaceConfiguration.Types.Append(new TypeConfigurationEntry(type, true));
-                        }
-                        else if (Context.InitialSessionState != null)
+                        if (Context.InitialSessionState != null)
                         {
                             Context.InitialSessionState.Types.Add(new SessionStateTypeEntry(type, true));
                         }
                         else
                         {
-                            Dbg.Assert(false, "Either RunspaceConfiguration or InitialSessionState must be non-null for Remove-Typedata to work");
+                            Dbg.Assert(false, "InitialSessionState must be non-null for Remove-Typedata to work");
                         }
                     }
                 }
